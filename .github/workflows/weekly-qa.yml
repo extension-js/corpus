@@ -31,7 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with: {node-version: 20}
+        with: {node-version: 22}
+      # The runner must satisfy the CLI's own engines.node, or every sample fails
+      # with the same engine refusal and the corpus verdict says nothing.
+      - run: node scripts/assert-runtime-supported.mjs
       - run: node scripts/sync.mjs
       # Corpus guard: tracked corpus dirs must be exactly what vendor.mjs wrote
       # (tamper gates the job). Also reports how far upstream moved past the
@@ -91,15 +94,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with: {node-version: 20}
+        with: {node-version: 22}
+      - run: node scripts/assert-runtime-supported.mjs
       - run: node scripts/sync.mjs
       - run: node scripts/discover.mjs
       - run: node scripts/run-matrix.mjs --tier all --install --browsers chrome,firefox,edge,safari
       - run: node scripts/report.mjs --markdown --baseline baseline.safari.json
         continue-on-error: true
+      # No continue-on-error here: the job is already non-gating at job level, and
+      # a swallowed verdict step made this lane report a green tick over a
+      # 0-of-218 NOT CLEAN run on 2026-08-03.
       - name: Status
         run: node scripts/status.mjs
-        continue-on-error: true
       - if: always()
         uses: actions/upload-artifact@v4
         with: {name: qa-report-macos, path: reports/}

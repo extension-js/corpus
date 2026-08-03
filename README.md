@@ -7,6 +7,8 @@ Real-world proof that [Extension.js](https://github.com/extension-js/extension.j
 
 Every week this testbed pulls hundreds of live browser-extension samples straight from their upstream repositories (MDN, Chrome, Chromium, Edge, Opera, and the Extension.js examples) and builds each one with the published Extension.js CLI. One question, answered on a schedule: can the framework take an extension it did not author and build it, unchanged, across Chrome, Firefox, and Edge? The badges above are the live answer.
 
+Read them precisely. **Weekly QA** is the gating lane: the full corpus on Linux against Chrome, Firefox, and Edge; its macOS twin adds Safari and is non-gating until Safari has a stable baseline, so it never colours the badge. **Smoke** is the fast lane: twelve raw samples from the tracked corpus on every push that touches the testbed. Both refuse to start on a runtime the CLI does not support, because a corpus-wide failure that is really an engine mismatch is not a verdict about the framework.
+
 The repo is also the corpus itself. Every validated sample set lives here as a browsable, pinned copy ([`mdn/`](mdn), [`chrome/`](chrome), [`chromium/`](chromium), and [`extension.js/`](extension.js)) indexed by [`catalog.json`](catalog.json), so downstream test suites can consume real-world extension data straight from a checkout, no sync required.
 
 ## Why this exists

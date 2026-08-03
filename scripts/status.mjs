@@ -12,6 +12,26 @@
 //   RE-BASELINE      scoring criteria changed since baseline          → exit 0 (neutral)
 import {REPORTS_DIR, readJson, fs, path} from './lib/util.mjs'
 
+// Failures are reported as ids, which says nothing about cause. When one error
+// text accounts for most of them the run is usually environmental, not a corpus
+// regression, so name the dominant reason next to the count that carries it.
+function dominantFailureReason() {
+  const latest = readJson(path.join(REPORTS_DIR, 'latest.json'), null)
+  if (!latest || !Array.isArray(latest.results)) return null
+  const counts = new Map()
+  for (const row of latest.results) {
+    for (const result of Object.values(row.browsers || {})) {
+      if (!result || result.status === 'pass' || result.status === 'skip') continue
+      const reason = String(result.error || '(no error captured)').split('\n')[0].trim().slice(0, 200)
+      counts.set(reason, (counts.get(reason) || 0) + 1)
+    }
+  }
+  if (counts.size === 0) return null
+  const total = [...counts.values()].reduce((a, b) => a + b, 0)
+  const [reason, count] = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]
+  return {reason, count, total, distinct: counts.size}
+}
+
 function main() {
   const diff = readJson(path.join(REPORTS_DIR, 'diff.json'), null)
   if (!diff) {
@@ -29,10 +49,17 @@ function main() {
   const verdict = skew ? '⚠️ RE-BASELINE NEEDED' : clean ? '✅ CLEAN' : '❌ NOT CLEAN'
   const pct = ((f.pass / f.attempted) * 100).toFixed(1)
 
+  const dominant = f.failures.length ? dominantFailureReason() : null
+
   const lines = [
     `# ${verdict} · ${diff.cliVersion}`,
     '',
     `**Framework health:** ${f.pass}/${f.attempted} buildable samples pass (${pct}%) · ${f.skipped} skipped (sample-side/upstream)`,
+    ...(dominant
+      ? [
+          `**Top failure reason:** ${dominant.count}/${dominant.total} failing builds (${dominant.distinct} distinct reason${dominant.distinct === 1 ? '' : 's'}) report: \`${dominant.reason}\``
+        ]
+      : []),
     `**Framework failures:** ${f.failures.length}${f.failures.length ? '\n' + f.failures.map((id) => `- ❌ \`${id}\``).join('\n') : ''}`,
     `**Confirmed regressions:** ${regressions.length}${regressions.length ? '\n' + regressions.map((id) => `- 🔴 \`${id}\``).join('\n') : ''}`,
     `**Progressions:** ${diff.progressions.length} · **Criteria:** \`${diff.criteria.hash}\`${skew ? ' (changed: re-baseline required, not a regression)' : ''}`
