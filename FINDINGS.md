@@ -1,4 +1,31 @@
-# QA Findings: first full run
+# QA Findings
+
+## Current reading (2026-08-03)
+
+**CLI:** `extension@4.0.27` · **Platform:** Linux · **Targets:** chrome, firefox, edge
+**Corpus:** 227 discovered samples, 218 attempted, 9 skipped (sample-side/upstream)
+**Run:** [30819326430](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30819326430), `tier=all --install`, criteria `e394f331798b`
+
+**213 / 218 (97.7%) build cleanly.** Firefox is 218 / 218. All five failures are
+Chrome and Edge, all five are `mdn/themes/*`, and all five are one cause: the
+sample declares `theme.colors.*` as a hex string (`"#ffffff"`, `"#000"`) and the
+build refuses because Chrome accepts only an `[R, G, B]` or `[R, G, B, A]` array.
+Firefox accepts the hex, which is why the same sample passes there. Filed
+upstream; a cross-browser tool converting the hex for the Chrome target is the
+open question, not the sample.
+
+Read the ten days before this run as no reading at all. Both lanes pinned
+`node-version: 20` while the CLI declares `engines.node >= 22.12`, so from
+2026-07-24 every sample failed with the same engine refusal and the report said
+`0/218` and `212 confirmed regressions`. Nothing about the framework was measured.
+Fixed in `d7df161`, and `scripts/assert-runtime-supported.mjs` now refuses the
+lane before the matrix runs rather than after it produces a corpus-shaped lie.
+
+The counts below are the first full run and are kept as the historical baseline.
+They describe `extension@3.18.4` against a 221-sample corpus and are not the
+current state.
+
+## First full run (historical, `extension@3.18.4`)
 
 **CLI:** `extension@3.18.4` · **Platform:** macOS · **Targets:** chrome, firefox, edge
 **Corpus:** 221 samples (MDN 70 · Chrome 99 · Extension.js 52)
