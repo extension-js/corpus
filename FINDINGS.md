@@ -2,21 +2,31 @@
 
 ## Current reading (2026-08-04)
 
-**CLI:** `extension@4.0.28` · **Platform:** Linux · **Targets:** chrome, firefox, edge
+**CLI:** `extension@4.0.29` · **Platform:** Linux + macOS · **Targets:** chrome, firefox, edge
 **Corpus:** 227 discovered samples, 218 attempted, 9 skipped (sample-side/upstream)
-**Run:** [30912374327](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30912374327), `tier=all --install`, criteria `e394f331798b`
+**Run:** [30915868576](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30915868576), `tier=all --install`, both lanes green
 
-**217 / 218 (99.5%) build cleanly.** Firefox is 218 / 218. The one failure is
+**218 / 218 (100%) build cleanly.** `4.0.29` (released 2026-08-04) closed
+[bug 07](bug-reports/07-theme-named-css-colors-rejected.md): named CSS colors
+in `theme.colors` now convert to Chromium's integer arrays the way hex already
+did, so `mdn/themes/temp` builds on all three targets and the Weekly QA badge
+is green on the whole corpus for the first time.
+
+### The reading it supersedes (earlier the same day)
+
+`extension@4.0.28` on run
+[30912374327](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30912374327)
+read **217 / 218 (99.5%)**, Firefox 218 / 218. The one failure was
 `mdn/themes/temp` on Chrome and Edge, confirmed twice by re-run: the sample
 declares `theme.colors.*` as **named** CSS colors (`"blue"`, `"black"`) and the
 build refuses them for Chromium targets. `4.0.28` fixed the hex-string refusal
 that `4.0.27` shipped on 2026-08-02 (that one took down all five hex-carrying
 `mdn/themes/*` samples in the 2026-08-03 reading, 213/218 on run
 [30819326430](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30819326430));
-named colors want the same conversion. Filed as
+named colors wanted the same conversion. Filed as
 [bug 07](bug-reports/07-theme-named-css-colors-rejected.md) with a pristine
-repro; until it ships, the Weekly QA badge is honestly red on exactly this one
-sample.
+repro the same morning; the fix shipped in `4.0.29` that afternoon and the
+badge went red-to-green on the rerun above.
 
 Read the ten days before 2026-08-03 as no reading at all. Both lanes pinned
 `node-version: 20` while the CLI declares `engines.node >= 22.12`, so from
