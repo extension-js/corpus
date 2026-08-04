@@ -1,20 +1,24 @@
 # QA Findings
 
-## Current reading (2026-08-03)
+## Current reading (2026-08-04)
 
-**CLI:** `extension@4.0.27` · **Platform:** Linux · **Targets:** chrome, firefox, edge
+**CLI:** `extension@4.0.28` · **Platform:** Linux · **Targets:** chrome, firefox, edge
 **Corpus:** 227 discovered samples, 218 attempted, 9 skipped (sample-side/upstream)
-**Run:** [30819326430](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30819326430), `tier=all --install`, criteria `e394f331798b`
+**Run:** [30912374327](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30912374327), `tier=all --install`, criteria `e394f331798b`
 
-**213 / 218 (97.7%) build cleanly.** Firefox is 218 / 218. All five failures are
-Chrome and Edge, all five are `mdn/themes/*`, and all five are one cause: the
-sample declares `theme.colors.*` as a hex string (`"#ffffff"`, `"#000"`) and the
-build refuses because Chrome accepts only an `[R, G, B]` or `[R, G, B, A]` array.
-Firefox accepts the hex, which is why the same sample passes there. Filed
-upstream; a cross-browser tool converting the hex for the Chrome target is the
-open question, not the sample.
+**217 / 218 (99.5%) build cleanly.** Firefox is 218 / 218. The one failure is
+`mdn/themes/temp` on Chrome and Edge, confirmed twice by re-run: the sample
+declares `theme.colors.*` as **named** CSS colors (`"blue"`, `"black"`) and the
+build refuses them for Chromium targets. `4.0.28` fixed the hex-string refusal
+that `4.0.27` shipped on 2026-08-02 (that one took down all five hex-carrying
+`mdn/themes/*` samples in the 2026-08-03 reading, 213/218 on run
+[30819326430](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30819326430));
+named colors want the same conversion. Filed as
+[bug 07](bug-reports/07-theme-named-css-colors-rejected.md) with a pristine
+repro; until it ships, the Weekly QA badge is honestly red on exactly this one
+sample.
 
-Read the ten days before this run as no reading at all. Both lanes pinned
+Read the ten days before 2026-08-03 as no reading at all. Both lanes pinned
 `node-version: 20` while the CLI declares `engines.node >= 22.12`, so from
 2026-07-24 every sample failed with the same engine refusal and the report said
 `0/218` and `212 confirmed regressions`. Nothing about the framework was measured.

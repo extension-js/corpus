@@ -1,9 +1,20 @@
 # Extension.js bug reports
 
-Likely Extension.js framework bugs surfaced by the QA testbed (`extension@3.18.4`).
+Likely Extension.js framework bugs surfaced by the QA testbed.
 Each report is self-contained: a committed, pristine repro under `repro/`, the exact
 build command, full error output, and root-cause analysis. Hand the absolute path of
 a report to the Extension.js maintainer/AI.
+
+## 🔴 Open on `extension@4.0.28`
+
+- **[Bug 07: named CSS colors in `theme.colors` rejected for Chromium targets](07-theme-named-css-colors-rejected.md)**:
+  `4.0.28` fixed the hex-string refusal that `4.0.27` shipped (bug hit five theme
+  samples); named colors (`"blue"`, `"black"`) still refuse, so `mdn/themes/temp`
+  is the one framework failure left in the corpus (217/218). Repro:
+  `repro/07-theme-named-css-colors`.
+
+Everything below this line is the 2026-06 `3.18.4` round; all six of those are
+fixed and validated.
 
 ## 🟢 Validate all six on `extension@3.18.4-canary.322.7da5ffe`
 
