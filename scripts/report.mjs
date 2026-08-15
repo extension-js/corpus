@@ -130,13 +130,25 @@ function main() {
   writeJson(path.join(REPORTS_DIR, 'diff.json'), diff)
 
   if (args.includes('--update')) {
+    // The baseline names the run it froze: when that run happened, which CLI
+    // it measured, and the denominator behind every percentage quoted from
+    // it. A pass count without its denominator is how an engine-mismatch run
+    // reading 0/218 once looked like a verdict about the framework.
+    const ids = Object.keys(current)
+    const skipped = ids.filter((id) => current[id] === 'skip').length
     writeJson(BASELINE, {
       updatedAt: new Date().toISOString(),
+      runAt: latest.generatedAt,
       cli: latest.cli,
       cliVersion: latest.cliVersion,
       platform: latest.platform,
       browsers: latest.browsers,
-      criteria, // scoring-rules fingerprint — future runs compare against this
+      corpus: {
+        discovered: ids.length,
+        attempted: ids.length - skipped,
+        skipped
+      },
+      criteria, // scoring-rules fingerprint, future runs compare against this
       samples: current
     })
     console.log(`baseline.json updated with ${Object.keys(current).length} samples (criteria ${criteria.hash})`)

@@ -71,8 +71,8 @@ Hundreds of third-party extensions will never all build, and that is fine. Some 
 What is left is the number worth trusting:
 
 ```
-✅ CLEAN · 4.0.3
-Framework health: 212/212 buildable samples pass (100.0%) · 9 skipped (sample-side/upstream)
+✅ CLEAN · 4.0.29
+Framework health: 218/218 buildable samples pass (100.0%) · 9 skipped (sample-side/upstream)
 Framework failures: 0 · Confirmed regressions: 0
 ```
 
@@ -86,6 +86,10 @@ The gate stays quiet unless something is genuinely wrong. Four mechanisms make t
 - **Asset integrity.** A build that exits `0` can still drop files the manifest declares. After each passing build, the emitted `manifest.json` is checked against `dist/`; a missing icon or theme image flips the verdict to `fail:missing-assets`. This caught five broken themes that exit codes alone called green.
 - **Criteria fingerprint.** A baseline is only comparable to a run scored under the same rules. `baseline.json` stores a hash of those rules, and when they change the report asks for a re-baseline instead of firing a false regression.
 - **Confirm before alerting.** Before the weekly job opens an issue, it re-runs only the regressing samples. Anything that clears on a retry was flaky infrastructure and is dropped. Only failures that survive every retry count.
+
+### Known failure modes
+
+- **The engine-mismatch false red.** For ten days in mid-2026 the CI lanes pinned a Node version older than the one the CLI declares in `engines.node`, so every install refused with the same engine error before a single sample built. The report dutifully read `0/218` with hundreds of "confirmed regressions", a corpus-shaped number that measured nothing about the framework. The tell was uniformity: a real regression lands on specific samples, while an environment failure lands on all of them identically. `scripts/assert-runtime-supported.mjs` now refuses the lane up front when the runner's Node does not satisfy the CLI's declared engine range, so this class fails loudly before the matrix instead of quietly inside it. If you ever see the whole corpus fail with one identical error, suspect the runner before the framework, and check that guard first.
 
 ## Usage
 
