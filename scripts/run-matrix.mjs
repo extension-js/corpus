@@ -73,7 +73,16 @@ function stage(sample) {
   return dest
 }
 
-async function build(cli, dir, browser, env) {
+// Where the CLI writes dist/ for a staged sample: next to the manifest's project.
+// A workspace sample keeps its manifest under packages/<name>/src, and the CLI
+// builds that package, so its output is not at the staged root.
+function outputRoot(dir, sample) {
+  const rel = path.dirname(sample.manifestRel || 'manifest.json')
+  const project = path.basename(rel) === 'src' ? path.dirname(rel) : rel
+  return path.join(dir, project)
+}
+
+async function build(cli, dir, browser, env, sample) {
   // Retry once on a hard build failure to absorb transient blips (npx cold-cache
   // races on fresh CI runners, network). A deterministic failure fails both tries.
   let r
@@ -90,8 +99,11 @@ async function build(cli, dir, browser, env) {
   // Build exited 0: assert the emitted manifest's referenced files were all emitted.
   // A green build that drops declared assets is a silent failure (see lib/integrity.mjs).
   if (CHECK_INTEGRITY) {
-    const {ok, missing} = checkManifestAssets(path.join(dir, 'dist', browser))
+    const {ok, missing, checked, manifest} = checkManifestAssets(path.join(outputRoot(dir, sample), 'dist', browser))
     if (!ok) return {status: 'fail', reason: 'missing-assets', ms: r.ms, error: `missing-assets: ${missing.join(', ')}`}
+    // assetsChecked is null when no emitted manifest was found, so a pass that
+    // was never checked is told apart from a pass with nothing to check.
+    return {status: 'pass', ms: r.ms, error: null, assetsChecked: manifest ? checked : null}
   }
   return {status: 'pass', ms: r.ms, error: null}
 }
@@ -176,7 +188,7 @@ async function processSample(cli, sample) {
     if (b === 'safari' && !IS_MAC) { browsers[b] = {status: 'skip', reason: 'non-macos'}; continue }
     if (sample.tier === 'install' && !DO_INSTALL) { browsers[b] = {status: 'skip', reason: 'needs-install'}; continue }
     if (installFailed) { browsers[b] = {status: 'fail', error: `install: ${installFailed}` }; continue }
-    browsers[b] = await build(cli, dir, b, env)
+    browsers[b] = await build(cli, dir, b, env, sample)
   }
 
   let runtime = null

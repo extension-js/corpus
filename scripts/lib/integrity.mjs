@@ -70,7 +70,7 @@ function referencedPaths(m) {
   return out
 }
 
-// Returns {ok, missing: string[], checked: number}. ok===true when distDir has no
+// Returns {ok, missing: string[], checked: number, manifest: boolean}. ok===true when distDir has no
 // emitted manifest (nothing to assert) or every referenced file exists.
 export function checkManifestAssets(distDir) {
   const manifestPath = path.join(distDir, 'manifest.json')
@@ -78,9 +78,9 @@ export function checkManifestAssets(distDir) {
   try {
     manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
   } catch {
-    return {ok: true, missing: [], checked: 0} // no manifest emitted → out of scope
+    return {ok: true, missing: [], checked: 0, manifest: false} // no manifest emitted → out of scope
   }
   const refs = [...new Set(referencedPaths(manifest).filter((p) => !SKIP(p)).map(norm))]
   const missing = refs.filter((rel) => !fs.existsSync(path.join(distDir, rel)))
-  return {ok: missing.length === 0, missing, checked: refs.length}
+  return {ok: missing.length === 0, missing, checked: refs.length, manifest: true}
 }
