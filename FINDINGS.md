@@ -1,6 +1,49 @@
 # QA Findings
 
-## Current reading (2026-08-04)
+## Current reading (2026-11-14)
+
+**CLI:** `extension@4.1.39` · **Platform:** macOS (local run of the Linux lane's steps) · **Targets:** chrome, firefox, edge
+**Corpus:** 236 discovered samples, 232 attempted, 4 skipped (sample-side/upstream)
+**Run:** local, `tier=all --install`, concurrency 6, criteria `a45441489280`
+
+**232 / 232 (100%) build cleanly**, 696 builds, no failure and no timeout on
+any target. Every passing build had its emitted manifest checked against
+`dist/` (2,855 referenced files, none missing).
+
+The corpus moved since the last reading because the three upstreams moved.
+`sources.lock.json` now pins `mdn` at `4b8c5825f9`, `chrome` at `657a941658`
+and `extensionjs` at `954d00c85c`. Against the 4.0.29 baseline the run adds
+25 samples and drops 16: the Extension.js examples renamed their `new-*`
+family to `newtab-*`, replaced `sidebar-monorepo-turbopack` with
+`sidebar-monorepo-nx`, and added seven `devtools*` examples and
+`sidebar-monorepo-turborepo`. MDN added `script-on-click`. The tracked sample
+directories still hold the earlier vendored cut.
+
+The skip list went from nine to four on 2026-11-04, when five samples that
+build on `4.1.38` re-entered the matrix. That changes the scoring criteria
+(`e394f331798b` to `a45441489280`), so this run re-pins `baseline.json`
+instead of diffing against it. The four standing skips were rebuilt the same
+day with `--no-skips` and all four still fail on all three targets for the
+reason `skips.json` records.
+
+Two notes on how to read it:
+
+- The baseline was frozen from a macOS run. Verdicts on the three targets
+  have matched across platforms on every earlier reading, and the next weekly
+  Linux run is the check that they still do.
+- The asset check used to look for `dist/<browser>` at the staged sample root
+  only. The two workspace examples (`sidebar-monorepo-nx`,
+  `sidebar-monorepo-turborepo`) emit under `packages/extension/dist`, so their
+  builds passed without being checked. The check now follows the manifest's
+  project, and each result records `assetsChecked` so an unchecked pass is
+  visible.
+
+Timing on a 10-core machine under heavy unrelated load (1-minute load average
+24 to 54): the matrix took 5 min 14 s on the first pass and 8 min 10 s on the
+second, the median build 2.2 s and 3.6 s. Sync, the corpus check and discover
+took 13 s together.
+
+## Earlier reading (2026-08-04)
 
 **CLI:** `extension@4.0.29` · **Platform:** Linux + macOS · **Targets:** chrome, firefox, edge
 **Corpus:** 227 discovered samples, 218 attempted, 9 skipped (sample-side/upstream)

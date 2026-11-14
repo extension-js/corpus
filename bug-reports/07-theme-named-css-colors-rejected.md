@@ -2,7 +2,7 @@
 
 **CLI:** reproduced on `extension@4.0.28`
 **Severity:** low: blocks Firefox-style themes that use named colors when built for chrome/edge
-**Status:** 🔴 OPEN on `extension@4.0.28`
+**Status:** 🟢 FIXED in `extension@4.0.29`, `mdn/themes/temp` builds on chrome, firefox and edge on `4.1.39` (2026-11-14)
 
 ## What happens
 

@@ -71,8 +71,8 @@ Hundreds of third-party extensions will never all build, and that is fine. Some 
 What is left is the number worth trusting:
 
 ```
-✅ CLEAN · 4.0.29
-Framework health: 218/218 buildable samples pass (100.0%) · 9 skipped (sample-side/upstream)
+✅ CLEAN · 4.1.39
+Framework health: 232/232 buildable samples pass (100.0%) · 4 skipped (sample-side/upstream)
 Framework failures: 0 · Confirmed regressions: 0
 ```
 
