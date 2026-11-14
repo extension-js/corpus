@@ -4,22 +4,22 @@
     "mdn/mocha-client-tests/addon": {
       "category": "upstream-corrupt",
       "reason": "upstream MDN commits an invalid 8KB browser-polyfill.min.js (node --check rejects it); builds fine with the genuine file (see bug-reports/01)",
-      "verified": "2026-11-04 extension@4.1.38: fails on chrome, firefox and edge, the bundler stops on a parse error inside browser-polyfill.min.js (Build failed with 2 errors)"
+      "verified": "2026-11-14 extension@4.1.39: fails on chrome, firefox and edge, the bundler stops on a parse error inside browser-polyfill.min.js (Build failed with 2 errors)"
     },
     "mdn/webpack-modules/addon": {
       "category": "sample-prebuilt",
       "reason": "manifest references background_scripts/index.js and popup/index.js, built output the sample expects its own webpack to produce",
-      "verified": "2026-11-04 extension@4.1.38: fails on chrome, firefox and edge, background.scripts NOT FOUND background_scripts/index.js"
+      "verified": "2026-11-14 extension@4.1.39: fails on chrome, firefox and edge, background.scripts NOT FOUND background_scripts/index.js"
     },
     "mdn/store-collected-images/webextension-with-webpack/extension": {
       "category": "sample-prebuilt",
       "reason": "manifest references dist/background.js: expects the sample's own webpack build first",
-      "verified": "2026-11-04 extension@4.1.38: fails on chrome, firefox and edge, background.scripts NOT FOUND dist/background.js"
+      "verified": "2026-11-14 extension@4.1.39: fails on chrome, firefox and edge, background.scripts NOT FOUND dist/background.js"
     },
     "chrome/functional-samples/libraries-xhr-in-sw": {
       "category": "sample-prebuilt",
       "reason": "manifest references dist/chrome/sidepanel/script.js and dist/background.js: expects the sample's own build first",
-      "verified": "2026-11-04 extension@4.1.38 with npm install: fails on chrome, firefox and edge, background.service_worker NOT FOUND dist/background.js"
+      "verified": "2026-11-14 extension@4.1.39 with npm install: fails on chrome, firefox and edge, background.service_worker NOT FOUND dist/background.js"
     }
   }
 }
