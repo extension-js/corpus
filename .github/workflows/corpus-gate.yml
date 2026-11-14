@@ -1,0 +1,83 @@
+name: Corpus gate
+
+# Builds the whole corpus with one exact Extension.js version from npm and
+# answers pass or fail. Another repository calls it before a release, and it
+# can be run by hand for any published version, a canary included.
+#
+# It reads the same baseline as the weekly lane and never writes it: only the
+# weekly run of a stable version moves the baseline.
+on:
+  workflow_call:
+    inputs:
+      cli-version:
+        description: 'Exact Extension.js version or dist-tag on npm (4.1.40, 4.1.40-canary.12.abc1234, latest)'
+        type: string
+        required: true
+      ref:
+        description: 'Commit, tag or branch of this repository to run'
+        type: string
+        default: main
+    outputs:
+      verdict:
+        description: 'clean, not-clean or rebaseline'
+        value: ${{ jobs.gate.outputs.verdict }}
+      clean:
+        description: 'true when no buildable sample fails'
+        value: ${{ jobs.gate.outputs.clean }}
+      cli-version:
+        description: 'The version the builds ran with'
+        value: ${{ jobs.gate.outputs.cli-version }}
+  workflow_dispatch:
+    inputs:
+      cli-version:
+        description: 'Exact Extension.js version or dist-tag on npm'
+        default: 'latest'
+        required: true
+      ref:
+        description: 'Commit, tag or branch of this repository to run'
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      verdict: ${{ steps.status.outputs.verdict }}
+      clean: ${{ steps.status.outputs.clean }}
+      cli-version: ${{ steps.status.outputs.cli-version }}
+    env:
+      EXTENSION_TAG: ${{ inputs.cli-version }}
+      QA_CONCURRENCY: '6'
+      QA_STRICT: '1'
+    steps:
+      # A called workflow checks out the caller by default, so name this one.
+      - uses: actions/checkout@v7
+        with:
+          repository: cezaraugusto/browser-extension-test-data
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with: {node-version: 22}
+      # Refuses a version npm does not have, so a typo cannot fall back to latest.
+      - run: node scripts/assert-runtime-supported.mjs
+      - run: node scripts/sync.mjs
+      - run: node scripts/discover.mjs
+      - run: node scripts/run-matrix.mjs --tier all --install --browsers chrome,firefox,edge
+      - name: Report
+        run: node scripts/report.mjs --markdown
+        continue-on-error: true
+      # A failure that clears on a second build was the runner, not the release.
+      - name: Confirm regressions
+        run: node scripts/confirm-regressions.mjs
+        continue-on-error: true
+      - name: Status
+        id: status
+        run: node scripts/status.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-gate-${{ inputs.cli-version }}
+          path: reports/
