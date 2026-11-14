@@ -10,6 +10,8 @@
 //   CLEAN            0 framework failures AND 0 confirmed regressions → exit 0 (green)
 //   NOT CLEAN        a framework failure or a confirmed regression    → exit 1 (red)
 //   RE-BASELINE      scoring criteria changed since baseline          → exit 0 (neutral)
+//
+// QA_STRICT=1 exits 1 on any framework failure, criteria change or not.
 import {REPORTS_DIR, readJson, fs, path} from './lib/util.mjs'
 
 // Failures are reported as ids, which says nothing about cause. When one error
@@ -69,8 +71,19 @@ function main() {
   console.log(summary)
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
 
+  // A workflow that calls this lane reads the verdict as step outputs.
+  if (process.env.GITHUB_OUTPUT) {
+    const word = skew ? 'rebaseline' : clean ? 'clean' : 'not-clean'
+    fs.appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `verdict=${word}\nclean=${clean}\ncli-version=${diff.cliVersion}\n`
+    )
+  }
+
   // Skew is not a product problem — don't fail the job on it (re-baseline instead).
-  if (!clean && !skew) process.exitCode = 1
+  // A release gate sets QA_STRICT: a failing build stops it whatever the baseline says.
+  const strict = process.env.QA_STRICT === '1'
+  if (!clean && (!skew || strict)) process.exitCode = 1
 }
 
 main()
