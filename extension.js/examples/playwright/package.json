@@ -1,16 +1,17 @@
 {
   "private": true,
   "name": "playwright",
-  "description": "Sidebar extension example demonstrating Playwright-driven E2E automation.",
+  "description": "Adds a sidebar panel to the browser, covered end to end by Playwright tests.",
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "author": {
-    "name": "Cezar Augusto",
-    "email": "boss@cezaraugusto.net",
-    "url": "https://cezaraugusto.com"
+  "scripts": {
+    "pretest": "playwright install chromium",
+    "test": "playwright test"
   },
   "devDependencies": {
-    "typescript": "5.3.3"
+    "@playwright/test": "^1.56.1",
+    "@types/chrome": "^0.0.287",
+    "typescript": "7.0.2"
   }
 }

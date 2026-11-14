@@ -9,6 +9,10 @@ import {createBadge} from './utils/create-badge.js'
 export default function initial() {
   const rootDiv = document.createElement('div')
   rootDiv.setAttribute('data-extension-root', 'top-left')
+  // Isolate the host from page styles (e.g. example.com ships div{opacity:.8},
+  // which would otherwise fade the whole widget): the shadow DOM only protects
+  // descendants; the host element itself still takes page CSS.
+  rootDiv.style.cssText = 'all: initial !important'
   document.body.appendChild(rootDiv)
 
   const shadowRoot = rootDiv.attachShadow({mode: 'open'})
@@ -35,8 +39,17 @@ export default function initial() {
 
   const description = document.createElement('p')
   description.className = 'content_description'
-  description.innerHTML =
-    'This content script runs in the context of web pages. Learn more at <a href="https://extension.js.org" target="_blank" rel="noreferrer noopener">extension.js.org</a>.'
+  const link = document.createElement('a')
+  link.href = 'https://extension.js.org'
+  link.target = '_blank'
+  link.rel = 'noreferrer noopener'
+  link.textContent = 'extension.js.org'
+  description.append(
+    'This content script runs in the context of web pages. Learn more at ',
+    link,
+    '.'
+  )
+
   contentDiv.appendChild(description)
 
   return () => {
@@ -48,5 +61,6 @@ async function fetchCSS() {
   const cssUrl = new URL('./styles.css', import.meta.url)
   const response = await fetch(cssUrl)
   const text = await response.text()
+
   return response.ok ? text : Promise.reject(text)
 }

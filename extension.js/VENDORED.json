@@ -3,8 +3,8 @@
   "name": "Extension.js first-party examples",
   "repo": "https://github.com/extension-js/examples",
   "ref": "main",
-  "sha": "f414697317ee03a91a3b190597b458c085ba41ff",
-  "vendoredAt": "2026-07-16T14:18:03.624Z",
+  "sha": "954d00c85cf00b277be04c87f4c36f9f9dc8d577",
+  "vendoredAt": "2026-11-14T21:13:32.930Z",
   "scan": [
     "examples"
   ],
@@ -17,7 +17,7 @@
     "public",
     "scripts"
   ],
-  "treeHash": "b4b5705fed9cbba7",
-  "files": 863,
-  "bytes": 19831768
+  "treeHash": "e6118ff087fc6d57",
+  "files": 1442,
+  "bytes": 22766399
 }

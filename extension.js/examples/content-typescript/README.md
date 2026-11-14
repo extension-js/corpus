@@ -1,13 +1,13 @@
 [powered-image]: https://img.shields.io/badge/Powered%20by-Extension.js-0971fe
 [powered-url]: https://extension.js.org
 
-[![Powered by Extension.js][powered-image]][powered-url]
+![Powered by Extension.js][powered-image]
 
 # TypeScript Content Script Example
 
-> Content script example built with TypeScript. Mounts a small UI and uses typed modules.
+> Shows a small overlay UI on every web page, with an options page that moves it from right to left.
 
-![screenshot](./public/screenshot.png)
+![screenshot](./screenshot.png)
 
 **What you'll see**: A small UI injected into any web page, isolated in a Shadow DOM so site styles don't bleed through.
 
@@ -32,32 +32,44 @@ src/
 │   ├── scripts.ts
 │   └── styles.css
 ├── images/
+│   ├── icon-128.png
+│   ├── icon-16.png
+│   ├── icon-32.png
+│   ├── icon-48.png
+│   ├── icon-64.png
 │   └── icon.png
+├── options/
+│   ├── index.html
+│   ├── scripts.ts
+│   └── styles.css
 ├── background.ts
-└── manifest.json
+├── manifest.json
+└── types.ts
 ```
 
 ## Commands
+
+Cloned this repo instead? The examples ship without npm scripts, so run Extension.js directly from the example directory. Run `npm install` first when the example declares dependencies.
 
 ### dev
 
 Run the extension in development mode. Target a browser with `--browser`:
 
 ```bash
-npm run dev                 # Chromium (default)
-npm run dev -- --browser=chrome
-npm run dev -- --browser=edge
-npm run dev -- --browser=firefox
+npx extension@latest dev .                  # Chromium (default)
+npx extension@latest dev . --browser=chrome
+npx extension@latest dev . --browser=edge
+npx extension@latest dev . --browser=firefox
 ```
 
 ### build
 
-Build for production. Convenience scripts cover each browser:
+Build for production:
 
 ```bash
-npm run build           # Chrome (default)
-npm run build:firefox
-npm run build:edge
+npx extension@latest build .                # Chromium (default)
+npx extension@latest build . --browser=firefox
+npx extension@latest build . --browser=edge
 ```
 
 ### preview
@@ -65,7 +77,7 @@ npm run build:edge
 Preview the production build with the bundled browser:
 
 ```bash
-npm run preview
+npx extension@latest preview .
 ```
 
 ## Tests

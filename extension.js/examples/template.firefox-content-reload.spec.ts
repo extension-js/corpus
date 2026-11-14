@@ -1,37 +1,10 @@
-// Firefox content-script hot-reload regression gate — VISIBLE-BEHAVIOR.
-//
-// Sibling of template.content-reload.spec.ts (which covers Chromium via
-// CDP). This file runs the exact same nine-scenario sequence against
-// real Firefox via the standard RDP socket the dev process opens:
-//
-//   1. Initial mount: anchor visible in shadow/light DOM
-//   2. JS edit: marker becomes visible in the same already-open tab
-//   3. JS revert: marker disappears, anchor restored
-//   4. JS syntax error: anchor still visible (last good build held)
-//   5. JS post-fix recovery: new marker lands after the fix
-//   6. CSS edit: custom property value visible on .content_script
-//   7. CSS syntax error: previous good property held
-//   8. CSS post-fix recovery: new property lands
-//   9. CSS revert: property goes away
-//
-// Step 4 + step 7 are the recoverability checks that catch dev-pipeline
-// crashes on user-source parse errors (the BuildEmitter ERR_UNHANDLED_ERROR
-// regression). Without those steps the existing fleet was blind to the
-// dev process dying — every scenario would still pass via stale state.
-//
-// Architecture mirrors the Chromium spec: spawn `extension dev` with
-// --browser=firefox, parse the RDP port from author-mode stdout, open a
-// regular http tab via Firefox's RDP `addTab`, query DOM/CSS via a
-// parallel RDP connection. evaluateJSAsync is invoked synchronously
-// (no top-level await, no Promise grips) so the result is a primitive
-// JSON string we can parse directly.
-
 import {expect, test as baseTest} from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import net from 'net'
 import {spawn, type ChildProcess} from 'child_process'
 import {getDirname} from './dirname.js'
+import {guardSource, releaseSource} from './source-guard.js'
 
 const __dirname = getDirname(import.meta.url)
 const examplesDir = __dirname
@@ -46,6 +19,9 @@ const JS_ANCHOR_PRIORITY: string[] = [
   'Click, grant, delight — little scripts take flight!',
   'This MAIN world content script',
   'Learn more about creating cross-browser extensions',
+  // A gecko build renders the static hint instead of the pill, so this must
+  // outrank 'Open sidebar', which survives only in the chromium branch.
+  'Use the toolbar icon to open the sidebar',
   'Open sidebar'
 ]
 
@@ -66,20 +42,25 @@ interface ContentExample {
 function candidateJsFiles(exampleDir: string): string[] {
   const out: string[] = []
   const manifestPath = path.join(exampleDir, 'src', 'manifest.json')
+
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     const entry = manifest?.content_scripts?.[0]?.js?.[0]
+
     if (typeof entry === 'string') {
       out.push(path.join(exampleDir, 'src', entry))
     }
   } catch {}
+
   const contentDir = path.join(exampleDir, 'src', 'content')
+
   if (fs.existsSync(contentDir)) {
     for (const f of fs.readdirSync(contentDir)) {
       if (/^(ContentApp|App|Content)\.(tsx?|jsx?|vue|svelte)$/.test(f)) {
         out.push(path.join(contentDir, f))
       }
     }
+
     for (const f of fs.readdirSync(contentDir)) {
       if (/\.(tsx?|jsx?|vue|svelte)$/.test(f)) {
         const full = path.join(contentDir, f)
@@ -87,28 +68,34 @@ function candidateJsFiles(exampleDir: string): string[] {
       }
     }
   }
+
   return out
 }
 
 function findJsAnchor(exampleDir: string): AnchorHit | null {
   for (const file of candidateJsFiles(exampleDir)) {
     if (!fs.existsSync(file)) continue
+
     let text = ''
+
     try {
       text = fs.readFileSync(file, 'utf8')
     } catch {
       continue
     }
+
     for (const anchor of JS_ANCHOR_PRIORITY) {
       if (text.includes(anchor)) return {file, anchor}
     }
   }
+
   return null
 }
 
 function findStyleTarget(exampleDir: string): StyleTarget | null {
   const contentDir = path.join(exampleDir, 'src', 'content')
   if (!fs.existsSync(contentDir)) return null
+
   const preferred = [
     'styles.css',
     'styles.scss',
@@ -116,32 +103,41 @@ function findStyleTarget(exampleDir: string): StyleTarget | null {
     'styles.module.css',
     'styles.module.scss'
   ]
+
   for (const name of preferred) {
     const p = path.join(contentDir, name)
     if (fs.existsSync(p)) return {file: p}
   }
+
   return null
 }
 
 function discoverContentExamples(): ContentExample[] {
   const out: ContentExample[] = []
+
   for (const name of fs.readdirSync(examplesDir)) {
     const dir = path.join(examplesDir, name)
     const manifestPath = path.join(dir, 'src', 'manifest.json')
     if (!fs.statSync(dir, {throwIfNoEntry: false})?.isDirectory?.()) continue
     if (!fs.existsSync(manifestPath)) continue
+
     let manifest: any
+
     try {
       manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     } catch {
       continue
     }
+
     if (!manifest?.content_scripts?.[0]?.js?.[0]) continue
+
     const jsAnchor = findJsAnchor(dir)
     if (!jsAnchor) continue
+
     const styleTarget = findStyleTarget(dir)
     out.push({name, dir, jsAnchor, styleTarget})
   }
+
   return out
 }
 
@@ -162,18 +158,18 @@ const SKIP_EXAMPLES = new Set<string>([
 const EXAMPLES = discoverContentExamples().filter((e) => {
   if (SKIP_EXAMPLES.has(e.name)) return false
   if (envFilter.length === 0) return true
+
   return envFilter.includes(e.name)
 })
 
-// ---------------------------------------------------------------------------
 // Dev server harness (--browser=firefox)
-// ---------------------------------------------------------------------------
 
 interface DevServer {
   proc: ChildProcess
   output: string
   rdpPort?: number
   addonReady?: boolean
+  startedAtMs: number
 }
 
 function startDev(exampleDir: string): DevServer {
@@ -209,57 +205,145 @@ function startDev(exampleDir: string): DevServer {
         ...geckoArgs
       ]
   const proc = spawn(command, args, {cwd: exampleDir, env, stdio: 'pipe'})
-  const server: DevServer = {proc, output: ''}
+  const server: DevServer = {proc, output: '', startedAtMs: Date.now()}
   const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
+
   const onData = (chunk: Buffer) => {
     const text = stripAnsi(chunk.toString())
     server.output += text
+
     if (server.rdpPort === undefined) {
-      // Accept either extension.js's author-mode line OR Firefox's own
-      // "Started devtools server on N" (the latter is the reliable signal in
-      // headless runs, where the author-mode debug-port line may not fire).
+      // Accept the engine's structured "browser  rdpPort=N requested=M" line
+      // OR Firefox's own "Started devtools server on N" (the latter is the
+      // reliable signal in headless runs where the engine line can lag). The
+      // old "Firefox debug port: N" grammar was removed in the redesign.
       const m =
-        text.match(/Firefox debug port:\s*(\d{3,5})/i) ||
+        text.match(/\brdpPort=(\d{3,5})/) ||
         text.match(/Started devtools server on\s*(\d{3,5})/i)
       if (m) server.rdpPort = Number(m[1])
     }
-    if (
-      !server.addonReady &&
-      /Firefox Add-on ready for development|Add-on ready for development/i.test(
-        text
-      )
-    ) {
+
+    if (!server.addonReady && /Add-on ready for development/i.test(text)) {
       server.addonReady = true
     }
   }
+
   proc.stdout?.on('data', onData)
   proc.stderr?.on('data', onData)
+
   return server
+}
+
+interface ReadyContract {
+  status?: string
+  pid?: number
+  rdpPort?: number
+  extensionId?: string
+  startedAt?: string
+}
+
+interface RunStamp {
+  pid?: number
+  startedAtMs?: number
+}
+
+// A ready.json is ours if it is stamped with our own dev pid, or, when a
+// wrapper process sits between us and the dev process, if it was started
+// after we spawned. `pnpm extension dev` puts pnpm's pid on `proc` and the
+// node child's pid in the contract, so pid alone rejects every live run.
+function isOurRun(ready: ReadyContract, stamp: RunStamp): boolean {
+  if (stamp.pid !== undefined && ready?.pid === stamp.pid) return true
+  if (stamp.startedAtMs === undefined) return false
+
+  const startedAt = Date.parse(String(ready?.startedAt || ''))
+  if (!Number.isFinite(startedAt)) return false
+
+  // 2s of slack: the contract is stamped by the dev process a moment after
+  // spawn, and clock granularity should not reject our own run.
+  return startedAt >= stamp.startedAtMs - 2000
+}
+
+// Read the ready.json contract the dev server writes under
+// <root>/extension-js/firefox/ready.json. Only trust a contract from our own
+// run, a leftover from a prior run satisfies every other field check.
+function readReadyContract(
+  dir: string,
+  stamp?: RunStamp
+): ReadyContract | null {
+  for (const root of DEV_ROOTS) {
+    const p = path.join(dir, root, 'extension-js', 'firefox', 'ready.json')
+
+    try {
+      const ready = JSON.parse(fs.readFileSync(p, 'utf8')) as ReadyContract
+      if (stamp !== undefined && !isOurRun(ready, stamp)) continue
+
+      return ready
+    } catch {}
+  }
+
+  return null
 }
 
 async function waitForRdpReady(
   server: DevServer,
+  exampleDir: string,
   timeoutMs = 90000
 ): Promise<number> {
+  // Primary signal: ready.json, the supported dev contract. It flips status
+  // to "ready" and gains a browser-confirmed rdpPort plus extensionId once
+  // the add-on is installed in the launched Firefox.
+  // Fallback: structured stdout, the "rdpPort=N" or "Started devtools server
+  // on N" line plus the "Add-on ready for development" line.
   const start = Date.now()
+
   while (Date.now() - start < timeoutMs) {
+    const ready = readReadyContract(exampleDir, {
+      pid: server.proc.pid,
+      startedAtMs: server.startedAtMs
+    })
+
+    if (
+      ready?.status === 'ready' &&
+      typeof ready.rdpPort === 'number' &&
+      ready.extensionId
+    ) {
+      server.rdpPort = ready.rdpPort
+      server.addonReady = true
+
+      return ready.rdpPort
+    }
+
     if (server.rdpPort !== undefined && server.addonReady) return server.rdpPort
+
     await new Promise((r) => setTimeout(r, 250))
   }
+
+  const anyReady = readReadyContract(exampleDir)
+
   throw new Error(
     `Firefox RDP not ready within ${timeoutMs}ms.\n` +
-      `Last output:\n${server.output.slice(-2000)}`
+      `Awaited: ready.json under <root>/extension-js/firefox with ` +
+      `status=ready, numeric rdpPort, extensionId, and pid=${server.proc.pid} ` +
+      `or startedAt at/after ${new Date(server.startedAtMs).toISOString()}, ` +
+      `or stdout lines "rdpPort=N" (or "Started devtools server on N") + ` +
+      `"Add-on ready for development".\n` +
+      `ready.json seen (any run): ${
+        anyReady ? JSON.stringify(anyReady) : 'none'
+      }\n` +
+      `Last dev output:\n${server.output.slice(-2000)}`
   )
 }
 
 async function stopDev(server: DevServer) {
   if (server.proc.killed) return
+
   server.proc.kill('SIGTERM')
   await new Promise((resolve) => {
     const timeout = setTimeout(() => {
       try {
         server.proc.kill('SIGKILL')
       } catch {}
+
       resolve(null)
     }, 5000)
     server.proc.on('close', () => {
@@ -274,6 +358,7 @@ function cleanDevRoots(dir: string) {
     try {
       fs.rmSync(path.join(dir, root, 'firefox'), {recursive: true, force: true})
     } catch {}
+
     try {
       fs.rmSync(path.join(dir, root, 'extension-profile-firefox'), {
         recursive: true,
@@ -285,17 +370,21 @@ function cleanDevRoots(dir: string) {
 
 function getLatestContentScriptMtime(dir: string): number {
   let latest = 0
+
   for (const root of DEV_ROOTS) {
     const csDir = path.join(dir, root, 'firefox', 'content_scripts')
     if (!fs.existsSync(csDir)) continue
+
     try {
       for (const f of fs.readdirSync(csDir)) {
         if (!/\.js$/.test(f) || /\.map$/.test(f)) continue
+
         const mt = fs.statSync(path.join(csDir, f)).mtimeMs
         if (mt > latest) latest = mt
       }
     } catch {}
   }
+
   return latest
 }
 
@@ -305,20 +394,21 @@ async function waitForBundleNewerThan(
   timeoutMs = 45000
 ): Promise<void> {
   const start = Date.now()
+
   while (Date.now() - start < timeoutMs) {
     if (getLatestContentScriptMtime(dir) > baseline) return
+
     await new Promise((r) => setTimeout(r, 200))
   }
+
   throw new Error(
     `firefox content_scripts bundle not re-emitted within ${timeoutMs}ms`
   )
 }
 
-// ---------------------------------------------------------------------------
 // Minimal Firefox RDP probe — opens a fresh socket per evaluation. Same
 // shape as my-ext empirical: greeting → listTabs → getTarget on tab
 // descriptor → evaluateJSAsync → JSON-stringified primitive result.
-// ---------------------------------------------------------------------------
 
 function rdpEvalAgainstExample(
   port: number,
@@ -332,6 +422,7 @@ function rdpEvalAgainstExample(
     let consoleActor: string | null = null
     let evalResultId: string | null = null
     let timer: NodeJS.Timeout | null = null
+
     function send(packet: any) {
       pendingFrom = packet.to
       const json = JSON.stringify(packet)
@@ -339,47 +430,60 @@ function rdpEvalAgainstExample(
         Buffer.from(`${Buffer.byteLength(json, 'utf-8')}:${json}`, 'utf-8')
       )
     }
+
     const teardown = () => {
       if (timer) clearTimeout(timer)
+
       try {
         sock.end()
       } catch {}
     }
+
     const fail = (err: Error) => {
       teardown()
       rejectPromise(err)
     }
+
     const done = (value: string) => {
       teardown()
       resolvePromise(value)
     }
+
     const onParsed = (packet: any) => {
       if (stage === 'greeting') {
         stage = 'listTabs'
         send({to: 'root', type: 'listTabs'})
+
         return
       }
+
       if (stage === 'listTabs' && packet.from === 'root' && packet.tabs) {
         const list = Array.isArray(packet.tabs) ? packet.tabs : []
         const tab = list.find((t: any) =>
           String(t?.url || '').includes('example.com')
         )
         if (!tab?.actor) return fail(new Error('no example.com tab'))
+
         stage = 'getTarget'
         send({to: tab.actor, type: 'getTarget'})
+
         return
       }
+
       if (stage === 'getTarget' && packet.from === pendingFrom) {
         const actor =
           packet?.frame?.consoleActor ||
           packet?.consoleActor ||
           packet?.target?.consoleActor
         if (!actor) return fail(new Error('no consoleActor on tab target'))
+
         consoleActor = actor
         stage = 'eval'
         send({to: consoleActor, type: 'evaluateJSAsync', text: expression})
+
         return
       }
+
       if (stage === 'eval' && packet.from === consoleActor) {
         // The result packet also has resultID — check the typed packet
         // first so we don't swallow it as just-the-ack.
@@ -390,42 +494,56 @@ function rdpEvalAgainstExample(
           const r = packet.result
           if (typeof r === 'string') return done(r)
           if (r && typeof r === 'object') return done(JSON.stringify(r))
+
           return done('')
         }
+
         if (typeof packet.resultID === 'string' && !packet.type) {
           evalResultId = packet.resultID
+
           return
         }
       }
     }
+
     sock.on('data', (chunk) => {
       buf = Buffer.concat([buf, chunk])
+
       while (true) {
         const colon = buf.indexOf(0x3a)
         if (colon < 0) break
+
         const len = parseInt(buf.subarray(0, colon).toString('utf-8'), 10)
+
         if (Number.isNaN(len)) {
           fail(new Error('bad framing'))
+
           return
         }
+
         if (buf.length < colon + 1 + len) break
+
         const body = buf.subarray(colon + 1, colon + 1 + len).toString('utf-8')
         buf = buf.subarray(colon + 1 + len)
+
         try {
           onParsed(JSON.parse(body))
         } catch {}
       }
     })
+
     sock.on('error', fail)
     sock.on('close', () => {
       if (stage !== 'eval') return
     })
+
     timer = setTimeout(() => fail(new Error('rdp eval timeout')), 10_000)
   })
 }
 
 function domContainsNeedleExpr(needle: string): string {
   const n = JSON.stringify(needle)
+
   return `JSON.stringify((function(){
     function walk(root){
       if (!root) return false;
@@ -444,6 +562,7 @@ function domContainsNeedleExpr(needle: string): string {
 function readStylePropertyExpr(className: string, prop: string): string {
   const selector = JSON.stringify('.' + className)
   const propStr = JSON.stringify(prop)
+
   // Walk the LATEST data-extension-root host in document order. Firefox's
   // executeScript-based reinjection creates a fresh sandbox per call, so
   // the wrapper's __EXTENSIONJS_DEV_REINJECT__ registry doesn't share
@@ -496,6 +615,7 @@ async function rdpReloadExampleTab(port: number): Promise<void> {
 async function probeContains(port: number, needle: string): Promise<boolean> {
   try {
     const raw = await rdpEvalAgainstExample(port, domContainsNeedleExpr(needle))
+
     return JSON.parse(raw) === true
   } catch {
     return false
@@ -513,15 +633,14 @@ async function probeStyleProperty(
       readStylePropertyExpr(className, prop)
     )
     const parsed = JSON.parse(raw) as string | null
+
     return parsed
   } catch {
     return null
   }
 }
 
-// ---------------------------------------------------------------------------
 // Parameterized tests
-// ---------------------------------------------------------------------------
 
 if (EXAMPLES.length === 0) {
   baseTest.skip('no content-script examples discovered', () => {})
@@ -538,21 +657,26 @@ for (const example of EXAMPLES) {
     baseTest.beforeAll(async ({}, testInfo) => {
       testInfo.setTimeout(240000)
       cleanDevRoots(example.dir)
-      originalJsSource = fs.readFileSync(example.jsAnchor.file, 'utf8')
+      originalJsSource = guardSource(example.jsAnchor.file)
+
       if (example.styleTarget) {
-        originalCssSource = fs.readFileSync(example.styleTarget.file, 'utf8')
+        originalCssSource = guardSource(example.styleTarget.file)
       }
+
       server = startDev(example.dir)
-      const port = await waitForRdpReady(server, 90000)
+      const port = await waitForRdpReady(server, example.dir, 90000)
       // Wait for the first manifest to land on disk.
       const deadline = Date.now() + 60000
+
       while (Date.now() < deadline) {
         const hit = DEV_ROOTS.map((root) =>
           path.join(example.dir, root, 'firefox', 'manifest.json')
         ).some((p) => fs.existsSync(p))
         if (hit) break
+
         await new Promise((r) => setTimeout(r, 300))
       }
+
       // Now that the add-on is installed and the build has landed, reload the
       // starting tab once so the content script injects (see
       // rdpReloadExampleTab). Without this the at-launch tab never mounts in
@@ -567,12 +691,17 @@ for (const example of EXAMPLES) {
           fs.writeFileSync(example.jsAnchor.file, originalJsSource, 'utf8')
         } catch {}
       }
+
       if (originalCssSource !== null && example.styleTarget) {
         try {
           fs.writeFileSync(example.styleTarget.file, originalCssSource, 'utf8')
         } catch {}
       }
+
+      releaseSource(example.jsAnchor.file)
+      if (example.styleTarget) releaseSource(example.styleTarget.file)
       if (server) await stopDev(server)
+
       server = null
     })
 
@@ -582,6 +711,7 @@ for (const example of EXAMPLES) {
         if (!server || server.rdpPort === undefined) {
           throw new Error('firefox dev server not ready')
         }
+
         const port = server.rdpPort
 
         // Step 1 — initial mount: poll for the original anchor in the
@@ -605,6 +735,7 @@ for (const example of EXAMPLES) {
           .join(`${example.jsAnchor.anchor} ${jsMarker}`)
         fs.writeFileSync(example.jsAnchor.file, editedJs, 'utf8')
         await waitForBundleNewerThan(example.dir, jsBaseline, 45000)
+
         try {
           await expect
             .poll(() => probeContains(port, jsMarker), {
@@ -630,6 +761,7 @@ for (const example of EXAMPLES) {
               };
             })())`
           )
+
           throw new Error(
             `JS marker "${jsMarker}" never reached the open Firefox tab.\n` +
               `Page state: ${diagRaw}\n\n` +
@@ -650,6 +782,7 @@ for (const example of EXAMPLES) {
                   port,
                   example.jsAnchor.anchor
                 )
+
                 return hasAnchor && !hasMarker
               },
               {timeout: 30000, intervals: [250, 500, 1000]}
@@ -665,18 +798,21 @@ for (const example of EXAMPLES) {
             port,
             example.jsAnchor.anchor
           )
+
           if (!beforeAnchor) {
             throw new Error(
               `precondition: anchor not visible *before* writing the syntax ` +
                 `error — earlier step left the page empty. Dev tail:\n${server!.output.slice(-2000)}`
             )
           }
+
           const broken =
             originalJsSource +
             '\n// __EXTJS_PROBE_SYNTAX_ERROR__\nconst x = ;\n'
           fs.writeFileSync(example.jsAnchor.file, broken, 'utf8')
           await new Promise((r) => setTimeout(r, 8000))
           const stillThere = await probeContains(port, example.jsAnchor.anchor)
+
           if (!stillThere) {
             const diagRaw = await rdpEvalAgainstExample(
               port,
@@ -695,6 +831,7 @@ for (const example of EXAMPLES) {
                 };
               })())`
             )
+
             throw new Error(
               `Firefox: anchor "${example.jsAnchor.anchor}" disappeared ` +
                 `during JS syntax error — recoverability broken.\n` +
@@ -721,6 +858,7 @@ for (const example of EXAMPLES) {
               intervals: [250, 500, 1000]
             })
             .toBe(true)
+
           // Restore for CSS phase.
           const cleanupBaseline = getLatestContentScriptMtime(example.dir)
           fs.writeFileSync(example.jsAnchor.file, originalJsSource!, 'utf8')
@@ -733,7 +871,7 @@ for (const example of EXAMPLES) {
             .toBe(false)
         }
 
-        // ---- CSS scenarios — non-modules stylesheets only ----
+        // CSS scenarios — non-modules stylesheets only
         if (
           example.styleTarget &&
           !/\.module\.(css|scss|sass|less)$/i.test(example.styleTarget.file)
@@ -766,6 +904,7 @@ for (const example of EXAMPLES) {
               'content_script',
               cssProbe
             )
+
             return (value || '').replace(/['"\s]/g, '')
           }
 
@@ -783,6 +922,7 @@ for (const example of EXAMPLES) {
             fs.writeFileSync(example.styleTarget.file, broken, 'utf8')
             await new Promise((r) => setTimeout(r, 8000))
             const heldValue = await readProbe()
+
             if (heldValue !== cssMarker) {
               throw new Error(
                 `Firefox: CSS prop ${cssProbe}=${cssMarker} lost during ` +
@@ -811,6 +951,7 @@ for (const example of EXAMPLES) {
                   'content_script',
                   recoveryProbe
                 )
+
                 return (value || '').replace(/['"\s]/g, '')
               },
               {timeout: 30000, intervals: [250, 500, 1000]}
@@ -829,6 +970,7 @@ for (const example of EXAMPLES) {
                   'content_script',
                   recoveryProbe
                 )
+
                 return (value || '').replace(/['"\s]/g, '')
               },
               {timeout: 30000, intervals: [250, 500, 1000]}

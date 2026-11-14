@@ -1,4 +1,5 @@
 .content_script {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: #0a0c10;
   background-color: #ffffff;
   position: fixed;
@@ -46,7 +47,3 @@
   border-radius: 6px;
 }
 
-.extjs-live-style-extjs-chromium-css-content-css-modules-css-style-only-1775396308665 {
-  outline: 3px solid #ff4d4f !important;
-  box-shadow: 0 0 0 2px #22c55e !important;
-}

@@ -1,19 +1,19 @@
 [powered-image]: https://img.shields.io/badge/Powered%20by-Extension.js-0971fe
 [powered-url]: https://extension.js.org
 
-[![Powered by Extension.js][powered-image]][powered-url]
+![Powered by Extension.js][powered-image]
 
 # Content Script in MAIN World Example
 
-> Main world content script with multiple groups. ISOLATED entries precede the MAIN world entry so bridge injection exercises canonical-index vs array-position resolution.
+> Injects a small UI into every web page from both the extension and the page's own JavaScript world, with an options page that moves it to the left or right edge.
 
-![screenshot](./public/screenshot.png)
+![screenshot](./screenshot.png)
 
 **What you'll see**: A small UI injected into any web page, isolated in a Shadow DOM so site styles don't bleed through.
 
 **How it works**: A content script mounts a JavaScript UI inside a Shadow DOM and applies scoped styles so the host page can't bleed through.
 
-Loads the content script in the page's **MAIN world** (Chromium-only). Useful when your script needs direct access to page-side globals or classes that the isolated world cannot reach. Firefox does not support MAIN-world content scripts, so this template is gated to Chromium targets.
+Loads the content script in the page's **MAIN world**, which Chrome 111, Firefox 128 and Safari 18 or later all support. Useful when your script needs direct access to page-side globals or classes that the isolated world cannot reach. A MAIN world script has no extension APIs, so the template pairs it with isolated scripts that bridge to the extension.
 
 ## Try it locally
 
@@ -32,39 +32,52 @@ A fresh browser window opens with the extension already loaded.
 src/
 ├── content/
 │   ├── utils/
+│   │   ├── bridge.js
 │   │   ├── constants.js
 │   │   └── create-badge.js
 │   ├── isolated-one.js
+│   ├── isolated-options.js
 │   ├── isolated-two.js
 │   ├── scripts.js
 │   └── styles.css
 ├── images/
+│   ├── icon-128.png
+│   ├── icon-16.png
+│   ├── icon-32.png
+│   ├── icon-48.png
+│   ├── icon-64.png
 │   └── icon.png
+├── options/
+│   ├── index.html
+│   ├── scripts.js
+│   └── styles.css
 ├── background.js
 └── manifest.json
 ```
 
 ## Commands
 
+Cloned this repo instead? The examples ship without npm scripts, so run Extension.js directly from the example directory. Run `npm install` first when the example declares dependencies.
+
 ### dev
 
 Run the extension in development mode. Target a browser with `--browser`:
 
 ```bash
-npm run dev                 # Chromium (default)
-npm run dev -- --browser=chrome
-npm run dev -- --browser=edge
-npm run dev -- --browser=firefox
+npx extension@latest dev .                  # Chromium (default)
+npx extension@latest dev . --browser=chrome
+npx extension@latest dev . --browser=edge
+npx extension@latest dev . --browser=firefox
 ```
 
 ### build
 
-Build for production. Convenience scripts cover each browser:
+Build for production:
 
 ```bash
-npm run build           # Chrome (default)
-npm run build:firefox
-npm run build:edge
+npx extension@latest build .                # Chromium (default)
+npx extension@latest build . --browser=firefox
+npx extension@latest build . --browser=edge
 ```
 
 ### preview
@@ -72,7 +85,7 @@ npm run build:edge
 Preview the production build with the bundled browser:
 
 ```bash
-npm run preview
+npx extension@latest preview .
 ```
 
 ## Tests

@@ -10,6 +10,10 @@ console.log('[From the page context] Hello from content_scripts!')
 export default function initial() {
   const rootDiv = document.createElement('div')
   rootDiv.setAttribute('data-extension-root', 'true')
+  // Isolate the host from page styles (e.g. example.com ships div{opacity:.8},
+  // which would otherwise fade the whole widget): the shadow DOM only protects
+  // descendants; the host element itself still takes page CSS.
+  rootDiv.style.cssText = 'all: initial !important'
   document.body.appendChild(rootDiv)
 
   const shadowRoot = rootDiv.attachShadow({mode: 'open'})
@@ -34,8 +38,21 @@ export default function initial() {
 
   const description = document.createElement('p')
   description.className = 'content_description'
-  description.innerHTML =
-    'Click below to inject the three <code>scripts/script-*.js</code> files into this page — same effect as clicking the extension toolbar icon. Learn more at <a href="https://extension.js.org" target="_blank" rel="noreferrer noopener">extension.js.org</a>.'
+  const code = document.createElement('code')
+  code.textContent = 'scripts/script-*.js'
+  const link = document.createElement('a')
+  link.href = 'https://extension.js.org'
+  link.target = '_blank'
+  link.rel = 'noreferrer noopener'
+  link.textContent = 'extension.js.org'
+  description.append(
+    'Click below to inject the three ',
+    code,
+    ' files into this page — same effect as clicking the extension toolbar icon. Learn more at ',
+    link,
+    '.'
+  )
+
   contentDiv.appendChild(description)
 
   contentDiv.appendChild(createRunButton())
@@ -71,6 +88,7 @@ function createRunButton() {
             '[special-folders-scripts] message failed',
             chrome.runtime.lastError.message
           )
+
           return
         }
 
@@ -80,6 +98,7 @@ function createRunButton() {
             '[special-folders-scripts] background returned error',
             response.error
           )
+
           return
         }
 
@@ -95,5 +114,6 @@ async function fetchCSS() {
   const cssUrl = new URL('./styles.css', import.meta.url)
   const response = await fetch(cssUrl)
   const text = await response.text()
+
   return response.ok ? text : Promise.reject(text)
 }

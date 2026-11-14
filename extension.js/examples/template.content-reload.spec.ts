@@ -1,31 +1,3 @@
-// Content-script hot-reload regression gate — VISIBLE-BEHAVIOR edition.
-//
-// Parameterized over every example that declares `content_scripts` in its
-// manifest. For each example this spec asserts two user-visible axes:
-//
-//   (A) JS source edit → visible TEXT CHANGE in the already-open tab.
-//       A known anchor string (e.g. "Content Template", "Open sidebar",
-//       "Learn more about creating cross-browser extensions") is replaced
-//       with `anchor + " <MARKER>"` in the source. The test then polls the
-//       same tab's DOM (light + all open shadow roots) until the marker
-//       is visible — or fails hard after 30s.
-//
-//   (B) CSS source edit → visible STYLE CHANGE in the already-open tab.
-//       A new rule is appended to the content-script stylesheet setting a
-//       custom CSS property on the extension root; the test polls the
-//       element's computed style for that property value.
-//
-// Architecture
-//   - `extension dev` is spawned for real and allowed to launch its own
-//     Chrome (we need the actual dev → CDP → open-tab reinject chain).
-//   - Playwright connects to that Chrome via `chromium.connectOverCDP`.
-//   - No navigation after the edit — the whole point is to prove the
-//     edit reaches the EXISTING tab.
-//
-// Every wait is a bounded poll against a concrete signal (bundle mtime,
-// DOM predicate). No fixed sleeps. Tests are serial because they share the
-// CDP port the dev server picks.
-
 import {expect, test as baseTest} from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
@@ -33,12 +5,15 @@ import {spawn, type ChildProcess} from 'child_process'
 import * as http from 'http'
 import WebSocket from 'ws'
 import {getDirname} from './dirname.js'
+import {guardSource, releaseSource} from './source-guard.js'
 
 const __dirname = getDirname(import.meta.url)
 const examplesDir = __dirname
 
 const DEV_ROOTS = ['.extension', 'dist', 'build']
-const DEV_CHANNELS = ['chrome', 'chromium', 'chrome-mv3']
+// Deliberately excludes `chrome`: that channel is the production build
+// scripts/build/prebuild-assets-templates.mjs publishes for the static specs.
+const DEV_CHANNELS = ['chromium', 'chrome-mv3']
 const localCliCjs = process.env.EXTENSION_LOCAL_CLI_CJS || ''
 
 // Priority-ordered list of visible-text anchors that exist in at least one
@@ -54,9 +29,7 @@ const JS_ANCHOR_PRIORITY: string[] = [
   'Open sidebar'
 ]
 
-// -----------------------------------------------------------------------------
 // Example discovery
-// -----------------------------------------------------------------------------
 
 interface AnchorHit {
   file: string
@@ -72,25 +45,31 @@ interface ContentExample {
   dir: string
   jsAnchor: AnchorHit // file + literal string to replace
   styleTarget: StyleTarget | null // editable stylesheet, if present
+  expectedRootCount: number // steady-state `data-extension-root` hosts
 }
 
 function candidateJsFiles(exampleDir: string): string[] {
   const out: string[] = []
   const manifestPath = path.join(exampleDir, 'src', 'manifest.json')
+
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     const entry = manifest?.content_scripts?.[0]?.js?.[0]
+
     if (typeof entry === 'string') {
       out.push(path.join(exampleDir, 'src', entry))
     }
   } catch {}
+
   const contentDir = path.join(exampleDir, 'src', 'content')
+
   if (fs.existsSync(contentDir)) {
     for (const f of fs.readdirSync(contentDir)) {
       if (/^(ContentApp|App|Content)\.(tsx?|jsx?|vue|svelte)$/.test(f)) {
         out.push(path.join(contentDir, f))
       }
     }
+
     // Also fall back to every .js/.ts/.tsx/.jsx in content/ if needed.
     for (const f of fs.readdirSync(contentDir)) {
       if (/\.(tsx?|jsx?|vue|svelte)$/.test(f)) {
@@ -99,28 +78,34 @@ function candidateJsFiles(exampleDir: string): string[] {
       }
     }
   }
+
   return out
 }
 
 function findJsAnchor(exampleDir: string): AnchorHit | null {
   for (const file of candidateJsFiles(exampleDir)) {
     if (!fs.existsSync(file)) continue
+
     let text = ''
+
     try {
       text = fs.readFileSync(file, 'utf8')
     } catch {
       continue
     }
+
     for (const anchor of JS_ANCHOR_PRIORITY) {
       if (text.includes(anchor)) return {file, anchor}
     }
   }
+
   return null
 }
 
 function findStyleTarget(exampleDir: string): StyleTarget | null {
   const contentDir = path.join(exampleDir, 'src', 'content')
   if (!fs.existsSync(contentDir)) return null
+
   const preferred = [
     'styles.css',
     'styles.scss',
@@ -128,32 +113,67 @@ function findStyleTarget(exampleDir: string): StyleTarget | null {
     'styles.module.css',
     'styles.module.scss'
   ]
+
   for (const name of preferred) {
     const p = path.join(contentDir, name)
     if (fs.existsSync(p)) return {file: p}
   }
+
   return null
+}
+
+// Steady-state user-root count for an example. Every declared content
+// script in these templates mounts exactly one `data-extension-root`
+// host (the content-multi templates mount four, one per corner), so the
+// healthy post-reinject count equals the number of declared js files,
+// not the hard-coded 1 this spec used to assert. Asserting the exact
+// per-template count keeps the leak check strict: a stale mount still
+// fails as count + 1, and a swallowed sibling mount fails as count - 1.
+function expectedRootCountFor(manifest: any): number {
+  const blocks = Array.isArray(manifest?.content_scripts)
+    ? manifest.content_scripts
+    : []
+  let count = 0
+
+  for (const block of blocks) {
+    if (block && Array.isArray(block.js)) count += block.js.length
+  }
+
+  return Math.max(1, count)
 }
 
 function discoverContentExamples(): ContentExample[] {
   const out: ContentExample[] = []
+
   for (const name of fs.readdirSync(examplesDir)) {
     const dir = path.join(examplesDir, name)
     const manifestPath = path.join(dir, 'src', 'manifest.json')
     if (!fs.statSync(dir, {throwIfNoEntry: false})?.isDirectory?.()) continue
     if (!fs.existsSync(manifestPath)) continue
+
     let manifest: any
+
     try {
       manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
     } catch {
       continue
     }
+
     if (!manifest?.content_scripts?.[0]?.js?.[0]) continue
+
     const jsAnchor = findJsAnchor(dir)
     if (!jsAnchor) continue // no known visible anchor — handled below
+
     const styleTarget = findStyleTarget(dir)
-    out.push({name, dir, jsAnchor, styleTarget})
+    out.push({
+      name,
+      dir,
+      jsAnchor,
+      styleTarget,
+      expectedRootCount: expectedRootCountFor(manifest)
+    })
   }
+
   return out
 }
 
@@ -177,17 +197,17 @@ const SKIP_EXAMPLES = new Set<string>([
 const EXAMPLES = discoverContentExamples().filter((e) => {
   if (SKIP_EXAMPLES.has(e.name)) return false
   if (envFilter.length === 0) return true
+
   return envFilter.includes(e.name)
 })
 
-// -----------------------------------------------------------------------------
 // Dev server harness
-// -----------------------------------------------------------------------------
 
 interface DevServer {
   proc: ChildProcess
   output: string
   cdpPort?: number
+  startedAtMs: number
 }
 
 function startDev(exampleDir: string): DevServer {
@@ -196,64 +216,174 @@ function startDev(exampleDir: string): DevServer {
     EXTENSION_AUTHOR_MODE: 'true'
   }
   const command = localCliCjs ? process.execPath : 'pnpm'
+  // Same override the fixtures honour: a browser-channel lane pins the
+  // Chromium the CLI launches instead of letting it pick the system one.
+  const chromiumBinary = (process.env.EXTENSION_CHROMIUM_BINARY || '').trim()
+  const chromiumArgs = chromiumBinary
+    ? ['--chromium-binary', chromiumBinary]
+    : []
   const args = localCliCjs
-    ? [localCliCjs, 'dev', exampleDir, '--browser=chromium', '--install=false']
-    : ['extension', 'dev', exampleDir, '--browser=chromium', '--install=false']
+    ? [
+        localCliCjs,
+        'dev',
+        exampleDir,
+        '--browser=chromium',
+        '--install=false',
+        ...chromiumArgs
+      ]
+    : [
+        'extension',
+        'dev',
+        exampleDir,
+        '--browser=chromium',
+        '--install=false',
+        ...chromiumArgs
+      ]
   const proc = spawn(command, args, {cwd: exampleDir, env, stdio: 'pipe'})
-  const server: DevServer = {proc, output: ''}
+  const server: DevServer = {proc, output: '', startedAtMs: Date.now()}
 
   // Strip ANSI color codes so our port regex matches.
   const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
+
   const onData = (chunk: Buffer) => {
     const text = stripAnsi(chunk.toString())
     server.output += text
+
     if (server.cdpPort === undefined) {
-      const m = text.match(/Chromium debug port:\s*(\d+)/)
+      // Current grammar is the structured "browser  cdpPort=N requested=M"
+      // line. The old "Chromium debug port: N" was removed in the redesign.
+      const m = text.match(/\bcdpPort=(\d+)/)
       if (m) server.cdpPort = Number(m[1])
     }
   }
+
   proc.stdout?.on('data', onData)
   proc.stderr?.on('data', onData)
 
   return server
 }
 
+interface ReadyContract {
+  status?: string
+  pid?: number
+  cdpPort?: number
+  rdpPort?: number
+  extensionId?: string
+  startedAt?: string
+}
+
+interface RunStamp {
+  pid?: number
+  startedAtMs?: number
+}
+
+// A ready.json is ours if it is stamped with our own dev pid, or, when a
+// wrapper process sits between us and the dev process, if it was started
+// after we spawned. `pnpm extension dev` puts pnpm's pid on `proc` and the
+// node child's pid in the contract, so pid alone rejects every live run.
+function isOurRun(ready: ReadyContract, stamp: RunStamp): boolean {
+  if (stamp.pid !== undefined && ready?.pid === stamp.pid) return true
+  if (stamp.startedAtMs === undefined) return false
+
+  const startedAt = Date.parse(String(ready?.startedAt || ''))
+  if (!Number.isFinite(startedAt)) return false
+
+  // 2s of slack: the contract is stamped by the dev process a moment after
+  // spawn, and clock granularity should not reject our own run.
+  return startedAt >= stamp.startedAtMs - 2000
+}
+
+// Read the ready.json contract the dev server writes under
+// <root>/extension-js/<browser>/ready.json. Only trust a contract from our
+// own run, a leftover from a prior run satisfies every other field check.
+// `cleanDevRoots` does not remove it: it wipes <root>/<channel>, and the
+// contract lives under <root>/extension-js/<browser>.
+function readReadyContract(
+  dir: string,
+  browser: string,
+  stamp?: RunStamp
+): ReadyContract | null {
+  for (const root of DEV_ROOTS) {
+    const p = path.join(dir, root, 'extension-js', browser, 'ready.json')
+
+    try {
+      const ready = JSON.parse(fs.readFileSync(p, 'utf8')) as ReadyContract
+      if (stamp !== undefined && !isOurRun(ready, stamp)) continue
+
+      return ready
+    } catch {}
+  }
+
+  return null
+}
+
 async function waitForCdpReady(
   server: DevServer,
+  exampleDir: string,
   timeoutMs = 90000
 ): Promise<number> {
-  // Three-phase wait:
-  //   1. "Chromium debug port: N" — parse the port Chrome picked
-  //   2. "Chrome CDP Client connected" — the dev server's own CDP handshake
-  //   3. "Extension ID" — logged after the extension is fully registered in
-  //      the browser. Without this, the first tab we open may race the
-  //      extension's own first content-script registration and subsequent
-  //      reinjects mis-target the tab.
+  // Primary signal: ready.json, the supported dev contract. It flips status
+  // to "ready" and gains a browser-confirmed cdpPort plus extensionId once
+  // the extension is registered in the launched browser.
+  // Fallback: structured stdout, the "cdpPort=N" line plus "cdp connected"
+  // plus the ready line. NOT the banner card's Extension ID row: the card
+  // keeps only its first three populated rows, and a dev run always fills
+  // Browser/Extension/Profile, so that row is never printed.
   const start = Date.now()
+
   while (Date.now() - start < timeoutMs) {
+    const ready = readReadyContract(exampleDir, 'chromium', {
+      pid: server.proc.pid,
+      startedAtMs: server.startedAtMs
+    })
+
+    if (
+      ready?.status === 'ready' &&
+      typeof ready.cdpPort === 'number' &&
+      ready.extensionId
+    ) {
+      server.cdpPort = ready.cdpPort
+
+      return ready.cdpPort
+    }
+
     if (
       server.cdpPort !== undefined &&
-      /Chrome CDP Client connected/i.test(server.output) &&
-      /Extension ID\s+[a-z0-9]/i.test(server.output)
+      /cdp\s+connected/i.test(server.output) &&
+      /ready for development/i.test(server.output)
     ) {
       return server.cdpPort
     }
+
     await new Promise((r) => setTimeout(r, 250))
   }
+
+  const anyReady = readReadyContract(exampleDir, 'chromium')
+
   throw new Error(
     `CDP did not become ready within ${timeoutMs}ms.\n` +
-      `Last output:\n${server.output.slice(-2000)}`
+      `Awaited: ready.json under <root>/extension-js/chromium with ` +
+      `status=ready, numeric cdpPort, extensionId, and pid=${server.proc.pid} ` +
+      `or startedAt at/after ${new Date(server.startedAtMs).toISOString()}, ` +
+      `or stdout lines "cdpPort=N" + "cdp connected" + "ready for ` +
+      `development".\n` +
+      `ready.json seen (any run): ${
+        anyReady ? JSON.stringify(anyReady) : 'none'
+      }\n` +
+      `Last dev output:\n${server.output.slice(-2000)}`
   )
 }
 
 async function stopDev(server: DevServer) {
   if (server.proc.killed) return
+
   server.proc.kill('SIGTERM')
   await new Promise((resolve) => {
     const timeout = setTimeout(() => {
       try {
         server.proc.kill('SIGKILL')
       } catch {}
+
       resolve(null)
     }, 5000)
     server.proc.on('close', () => {
@@ -264,15 +394,18 @@ async function stopDev(server: DevServer) {
 }
 
 function cleanDevRoots(dir: string) {
-  for (const root of DEV_ROOTS)
-    for (const ch of DEV_CHANNELS)
+  for (const root of DEV_ROOTS) {
+    for (const ch of DEV_CHANNELS) {
       try {
         fs.rmSync(path.join(dir, root, ch), {recursive: true, force: true})
       } catch {}
+    }
+  }
+
   // Also drop persistent profiles — accumulated tabs from prior runs create
   // dozens of stale `[data-extension-root]` hosts + CDP targets that race
   // with our test's reinject flow.
-  for (const root of DEV_ROOTS)
+  for (const root of DEV_ROOTS) {
     for (const ch of DEV_CHANNELS) {
       try {
         fs.rmSync(path.join(dir, root, `extension-profile-${ch}`), {
@@ -281,23 +414,28 @@ function cleanDevRoots(dir: string) {
         })
       } catch {}
     }
+  }
 }
 
 function getLatestContentScriptMtime(dir: string): number {
   let latest = 0
+
   for (const root of DEV_ROOTS) {
     for (const ch of DEV_CHANNELS) {
       const csDir = path.join(dir, root, ch, 'content_scripts')
       if (!fs.existsSync(csDir)) continue
+
       try {
         for (const f of fs.readdirSync(csDir)) {
           if (!/\.js$/.test(f) || /\.map$/.test(f)) continue
+
           const mt = fs.statSync(path.join(csDir, f)).mtimeMs
           if (mt > latest) latest = mt
         }
       } catch {}
     }
   }
+
   return latest
 }
 
@@ -307,14 +445,16 @@ async function waitForBundleNewerThan(
   timeoutMs = 45000
 ): Promise<void> {
   const start = Date.now()
+
   while (Date.now() - start < timeoutMs) {
     if (getLatestContentScriptMtime(dir) > baseline) return
+
     await new Promise((r) => setTimeout(r, 200))
   }
+
   throw new Error(`content_scripts bundle not re-emitted within ${timeoutMs}ms`)
 }
 
-// -----------------------------------------------------------------------------
 // Raw CDP tab driver
 //
 // Deliberately not using Playwright's `chromium.connectOverCDP` + `newPage()`
@@ -323,7 +463,6 @@ async function waitForBundleNewerThan(
 // page stayed stale). Opening the tab via /json/new and driving it over a
 // WebSocket mirrors the real user scenario and matches the manual
 // reproduction that proved the reload chain works end-to-end.
-// -----------------------------------------------------------------------------
 
 interface JsonTarget {
   id: string
@@ -361,6 +500,7 @@ async function openCdpTab(
   // so retry until it answers or the ceiling fires.
   const start = Date.now()
   let lastErr: unknown = null
+
   while (Date.now() - start < timeoutMs) {
     try {
       const target = await httpJson<JsonTarget>({
@@ -372,12 +512,14 @@ async function openCdpTab(
       })
       const tab = new CdpTab(port, target.id, target.webSocketDebuggerUrl)
       await tab.connect()
+
       return tab
     } catch (err) {
       lastErr = err
       await new Promise((r) => setTimeout(r, 400))
     }
   }
+
   throw new Error(
     `openCdpTab(${port}, ${url}) failed within ${timeoutMs}ms: ${String(
       (lastErr as any)?.message || lastErr
@@ -409,9 +551,11 @@ class CdpTab {
       ws.once('open', () => resolve())
       ws.once('error', reject)
     })
+
     this.ws.on('message', (raw: Buffer | string) => {
       try {
         const m = JSON.parse(raw.toString())
+
         if (typeof m.id === 'number' && this.pending.has(m.id)) {
           const resolve = this.pending.get(m.id)!
           this.pending.delete(m.id)
@@ -423,7 +567,9 @@ class CdpTab {
 
   send(method: string, params: Record<string, unknown> = {}): Promise<any> {
     if (!this.ws) throw new Error('not connected')
+
     const id = ++this.nextId
+
     return new Promise((resolve) => {
       this.pending.set(id, resolve)
       this.ws!.send(JSON.stringify({id, method, params}))
@@ -437,6 +583,7 @@ class CdpTab {
       awaitPromise: false
     })
     if (m.result?.exceptionDetails) return null
+
     return (m.result?.result?.value as T) ?? null
   }
 
@@ -450,9 +597,11 @@ class CdpTab {
         headers: {Host: `localhost:${this.port}`}
       })
     } catch {}
+
     try {
       this.ws?.close()
     } catch {}
+
     this.ws = null
   }
 }
@@ -462,6 +611,7 @@ class CdpTab {
 // verbatim to CDP's Runtime.evaluate.
 function domContainsNeedleExpr(needle: string): string {
   const n = JSON.stringify(needle)
+
   return `(function(){
     function walk(root){
       if (!root) return false;
@@ -481,13 +631,26 @@ function domContainsNeedleExpr(needle: string): string {
 // given class name in the light DOM or any open shadow root, returns the
 // getComputedStyle().getPropertyValue(prop) for the first match. Returned
 // as a string for CDP.evaluate.
+//
+// The devtools companion extension mounts its own shadow host with a
+// \`.content_script\` element inside. Reinjects re-append the user root to
+// the END of body, so after the first reinject the companion host can
+// precede the user root in document order and its unstyled element would
+// win this first-match probe forever. Skip the companion subtree.
 function readStylePropertyExpr(params: {
   className: string
   prop: string
 }): string {
   const selector = JSON.stringify('.' + params.className)
   const prop = JSON.stringify(params.prop)
+
   return `(function(){
+    function isCompanionHost(el){
+      try {
+        return typeof el.getAttribute === 'function' &&
+          el.getAttribute('data-extension-root') === 'extension-js-devtools';
+      } catch (e) { return false; }
+    }
     function find(root){
       if (!root) return null;
       try {
@@ -500,7 +663,7 @@ function readStylePropertyExpr(params: {
         ? Array.from(root.querySelectorAll('*'))
         : [];
       for (var i = 0; i < all.length; i++) {
-        if (all[i].shadowRoot) {
+        if (all[i].shadowRoot && !isCompanionHost(all[i])) {
           var hit = find(all[i].shadowRoot);
           if (hit) return hit;
         }
@@ -513,6 +676,48 @@ function readStylePropertyExpr(params: {
       var cs = ((el.ownerDocument && el.ownerDocument.defaultView) || window).getComputedStyle(el);
       return cs.getPropertyValue(${prop}).trim();
     } catch (e) { return null; }
+  })()`
+}
+
+// Style-focused diagnostic: every element matching the class name across
+// light DOM and open shadow roots, with its host chain and the probed
+// property value. Names WHICH element a failed style poll actually read.
+function styleDiagnosticExpr(params: {
+  className: string
+  prop: string
+}): string {
+  const selector = JSON.stringify('.' + params.className)
+  const prop = JSON.stringify(params.prop)
+
+  return `(function(){
+    var out = [];
+    function describeHost(el){
+      try {
+        var rootNode = el.getRootNode ? el.getRootNode() : null;
+        var host = rootNode && rootNode.host ? rootNode.host : null;
+        if (!host) return 'light-dom';
+        return (host.tagName || '').toLowerCase() +
+          '[data-extension-root=' + String(host.getAttribute && host.getAttribute('data-extension-root')) + ']';
+      } catch (e) { return 'unknown'; }
+    }
+    function collect(root){
+      try {
+        if (typeof root.querySelectorAll !== 'function') return;
+        Array.from(root.querySelectorAll(${selector})).forEach(function(el){
+          var value = '';
+          try {
+            value = ((el.ownerDocument && el.ownerDocument.defaultView) || window)
+              .getComputedStyle(el).getPropertyValue(${prop}).trim();
+          } catch (e) {}
+          out.push({host: describeHost(el), value: value, text: String(el.textContent || '').slice(0, 80)});
+        });
+        Array.from(root.querySelectorAll('*')).forEach(function(el){
+          if (el.shadowRoot) collect(el.shadowRoot);
+        });
+      } catch (e) {}
+    }
+    collect(document);
+    return out;
   })()`
 }
 
@@ -532,16 +737,249 @@ function domDiagnosticExpr(): string {
   })()`
 }
 
+// A failed smoke check used to leave nothing in the report but a false
+// poll. This names what the session did instead: its output, the page, the
+// browser's targets, the worker's registry state and the bundles on disk.
+async function describeMountFailure(
+  server: DevServer,
+  example: ContentExample,
+  tab: CdpTab
+): Promise<string> {
+  const port = server.cdpPort!
+  const page = await tab.evaluate<unknown>(domDiagnosticExpr())
+  const ready = readReadyContract(example.dir, 'chromium')
+  let targets: JsonTarget[] = []
+
+  try {
+    targets = await httpJson<JsonTarget[]>({
+      host: '127.0.0.1',
+      port,
+      path: '/json/list',
+      method: 'GET',
+      headers: {Host: `localhost:${port}`}
+    })
+  } catch {}
+
+  const worker = await probeDevWorker(port, targets, ready?.extensionId)
+
+  return [
+    describeOwnTab(tab, targets),
+    `Page state: ${JSON.stringify(page, null, 2)}`,
+    `Browser targets:\n${targets
+      .map((t) => `  ${t.type} ${t.url}`)
+      .join('\n')}`,
+    `Worker state: ${worker}`,
+    `Registry on disk:\n${describeRegistryOnDisk(example.dir)}`,
+    `Dev server output tail:\n${server.output.slice(-4000)}`
+  ].join('\n\n')
+}
+
+// The tab this spec opened, found by its own target id. A first run can move
+// whichever tab is active, so the report names the spec's tab, not any page.
+function describeOwnTab(tab: CdpTab, targets: JsonTarget[]): string {
+  const own = targets.find((t) => t.id === tab.targetId)
+
+  if (!own) return `Spec tab ${tab.targetId}: closed, no longer in /json/list`
+
+  if (own.url.startsWith('https://example.com')) {
+    return `Spec tab ${tab.targetId}: still on ${own.url}`
+  }
+
+  return `Spec tab ${tab.targetId}: navigated away to ${own.url}`
+}
+
+async function ownTabUrl(tab: CdpTab): Promise<string> {
+  const targets = await httpJson<JsonTarget[]>({
+    host: '127.0.0.1',
+    port: tab.port,
+    path: '/json/list',
+    method: 'GET',
+    headers: {Host: `localhost:${tab.port}`}
+  })
+
+  return targets.find((t) => t.id === tab.targetId)?.url ?? ''
+}
+
+// The extension's worker, asked over the browser socket whether the dev
+// runtime booted, read its registry and registered the entries. A worker
+// that cannot answer within the budget is reported as such, not awaited.
+async function probeDevWorker(
+  port: number,
+  targets: JsonTarget[],
+  extensionId?: string
+): Promise<string> {
+  const worker =
+    targets.find(
+      (t) =>
+        t.type === 'service_worker' &&
+        Boolean(extensionId) &&
+        t.url.includes(String(extensionId))
+    ) || targets.find((t) => t.type === 'service_worker')
+
+  if (!worker) return 'no service_worker target in the browser'
+
+  const expression = `(async function(){
+    var out = {url: location.href, installed: !!globalThis.__extjsDevContentScriptsInstalled, ready: null, registryStatus: null, registered: null};
+    try { out.ready = globalThis.__extjsDevContentScripts ? globalThis.__extjsDevContentScripts.isReady() : null; } catch (e) {}
+    try {
+      var r = await fetch(chrome.runtime.getURL('content_scripts/dev-registry.json'), {cache: 'no-store'});
+      out.registryStatus = r.status;
+    } catch (e) { out.registryStatus = 'fetch failed: ' + String(e && e.message); }
+    try {
+      var regs = await chrome.scripting.getRegisteredContentScripts();
+      out.registered = regs.map(function (s) { return {id: s.id, js: s.js, matches: s.matches}; });
+    } catch (e) { out.registered = 'failed: ' + String(e && e.message); }
+    return JSON.stringify(out);
+  })()`
+
+  try {
+    const version = await httpJson<{webSocketDebuggerUrl: string}>({
+      host: '127.0.0.1',
+      port,
+      path: '/json/version',
+      method: 'GET',
+      headers: {Host: `localhost:${port}`}
+    })
+    const browser = await openCdpSession(version.webSocketDebuggerUrl)
+
+    try {
+      const attached = await browser.send('Target.attachToTarget', {
+        targetId: worker.id,
+        flatten: true
+      })
+      const sessionId = attached.result?.sessionId
+      if (!sessionId) return `attach failed: ${JSON.stringify(attached.error)}`
+
+      const evaluated = await browser.send(
+        'Runtime.evaluate',
+        {expression, awaitPromise: true, returnByValue: true},
+        sessionId
+      )
+
+      return String(
+        evaluated.result?.result?.value ??
+          JSON.stringify(evaluated.result?.exceptionDetails ?? evaluated.error)
+      )
+    } finally {
+      browser.close()
+    }
+  } catch (err) {
+    return `probe failed: ${String((err as any)?.message || err)}`
+  }
+}
+
+interface CdpSession {
+  send(
+    method: string,
+    params?: Record<string, unknown>,
+    sessionId?: string
+  ): Promise<any>
+  close(): void
+}
+
+async function openCdpSession(
+  wsUrl: string,
+  timeoutMs = 5000
+): Promise<CdpSession> {
+  const ws = new WebSocket(wsUrl)
+  const pending = new Map<number, (m: any) => void>()
+  let nextId = 0
+
+  await new Promise<void>((resolve, reject) => {
+    ws.once('open', () => resolve())
+    ws.once('error', reject)
+  })
+
+  ws.on('message', (raw: Buffer | string) => {
+    try {
+      const m = JSON.parse(raw.toString())
+
+      if (typeof m.id === 'number' && pending.has(m.id)) {
+        pending.get(m.id)!(m)
+        pending.delete(m.id)
+      }
+    } catch {}
+  })
+
+  return {
+    send(method, params = {}, sessionId) {
+      const id = ++nextId
+
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          pending.delete(id)
+          resolve({
+            error: {message: `${method} timed out after ${timeoutMs}ms`}
+          })
+        }, timeoutMs)
+        pending.set(id, (m) => {
+          clearTimeout(timer)
+          resolve(m)
+        })
+
+        ws.send(JSON.stringify({id, method, params, sessionId}))
+      })
+    },
+    close() {
+      try {
+        ws.close()
+      } catch {}
+    }
+  }
+}
+
+function describeRegistryOnDisk(dir: string): string {
+  const lines: string[] = []
+
+  for (const root of DEV_ROOTS) {
+    for (const ch of DEV_CHANNELS) {
+      const outDir = path.join(dir, root, ch)
+      const registryPath = path.join(
+        outDir,
+        'content_scripts',
+        'dev-registry.json'
+      )
+      if (!fs.existsSync(registryPath)) continue
+
+      let entries: Array<{entry?: string; js?: string[]; static?: boolean}> = []
+
+      try {
+        entries =
+          JSON.parse(fs.readFileSync(registryPath, 'utf8')).entries || []
+      } catch (err) {
+        lines.push(`  ${registryPath}: unreadable (${String(err)})`)
+        continue
+      }
+
+      lines.push(`  ${registryPath}: ${entries.length} entries`)
+
+      for (const entry of entries) {
+        for (const file of entry.js || []) {
+          const present = fs.existsSync(path.join(outDir, file))
+          lines.push(
+            `    ${entry.entry}${entry.static ? ' (static)' : ''} -> ${file} ${
+              present ? 'present' : 'MISSING'
+            }`
+          )
+        }
+      }
+    }
+  }
+
+  return lines.length
+    ? lines.join('\n')
+    : '  no dev-registry.json under any dev root'
+}
+
 // Count user-extension roots in the page (excluding the devtools companion).
-// We assert "exactly one" after each reinject — duplicate hosts from stale
-// mounts that this test used to miss are now a hard fail.
+// We assert the template's exact steady-state count after each reinject,
+// duplicate hosts from stale mounts that this test used to miss are now a
+// hard fail. See expectedRootCountFor for why the count is per-template.
 function userRootCountExpr(): string {
   return `document.querySelectorAll('[data-extension-root]:not([data-extension-root="extension-js-devtools"])').length`
 }
 
-// -----------------------------------------------------------------------------
 // Parameterized tests
-// -----------------------------------------------------------------------------
 
 if (EXAMPLES.length === 0) {
   baseTest.skip('no content-script examples discovered', () => {})
@@ -558,14 +996,17 @@ for (const example of EXAMPLES) {
     baseTest.beforeAll(async ({}, testInfo) => {
       testInfo.setTimeout(180000)
       cleanDevRoots(example.dir)
-      originalJsSource = fs.readFileSync(example.jsAnchor.file, 'utf8')
+      originalJsSource = guardSource(example.jsAnchor.file)
+
       if (example.styleTarget) {
-        originalCssSource = fs.readFileSync(example.styleTarget.file, 'utf8')
+        originalCssSource = guardSource(example.styleTarget.file)
       }
+
       server = startDev(example.dir)
-      await waitForCdpReady(server, 90000)
+      await waitForCdpReady(server, example.dir, 90000)
       // Wait for the first manifest to land on disk.
       const deadline = Date.now() + 60000
+
       while (Date.now() < deadline) {
         const hit = DEV_ROOTS.flatMap((root) =>
           DEV_CHANNELS.map((ch) =>
@@ -573,6 +1014,7 @@ for (const example of EXAMPLES) {
           )
         ).some((p) => fs.existsSync(p))
         if (hit) break
+
         await new Promise((r) => setTimeout(r, 300))
       }
     })
@@ -585,12 +1027,17 @@ for (const example of EXAMPLES) {
           fs.writeFileSync(example.jsAnchor.file, originalJsSource, 'utf8')
         } catch {}
       }
+
       if (originalCssSource !== null && example.styleTarget) {
         try {
           fs.writeFileSync(example.styleTarget.file, originalCssSource, 'utf8')
         } catch {}
       }
+
+      releaseSource(example.jsAnchor.file)
+      if (example.styleTarget) releaseSource(example.styleTarget.file)
       if (server) await stopDev(server)
+
       server = null
     })
 
@@ -618,17 +1065,42 @@ for (const example of EXAMPLES) {
           // Smoke check: the extension actually mounted its original anchor.
           // Guards against false negatives where the content script never
           // ran at all (broken example, broken extension, etc.).
-          await expect
-            .poll(
-              () =>
-                tab.evaluate<boolean>(
-                  domContainsNeedleExpr(example.jsAnchor.anchor)
-                ),
-              {timeout: 30000, intervals: [250, 500, 1000]}
-            )
-            .toBe(true)
+          try {
+            await expect
+              .poll(
+                () =>
+                  tab.evaluate<boolean>(
+                    domContainsNeedleExpr(example.jsAnchor.anchor)
+                  ),
+                {timeout: 30000, intervals: [250, 500, 1000]}
+              )
+              .toBe(true)
+          } catch (err) {
+            const ownUrl = await ownTabUrl(tab).catch(() => '')
+            const moved = ownUrl.startsWith('https://example.com')
+              ? ''
+              : `Spec tab ${tab.targetId} is on "${ownUrl}", not https://example.com/, so no content script could mount.\n`
 
-          // ------- JS edit: visible text must change in the SAME tab -------
+            throw new Error(
+              moved +
+                `Anchor "${example.jsAnchor.anchor}" never mounted in the open tab.\n` +
+                `${String((err as Error)?.message || err)}\n\n` +
+                (await describeMountFailure(server!, example, tab))
+            )
+          }
+
+          // Wait for EVERY declared script to finish its initial mount
+          // before editing. The multi templates mount one host per script
+          // at document_idle, and an edit racing a late sibling mount would
+          // make the post-reinject count assertions ambiguous.
+          await expect
+            .poll(() => tab.evaluate<number>(userRootCountExpr()), {
+              timeout: 30000,
+              intervals: [250, 500, 1000]
+            })
+            .toBe(example.expectedRootCount)
+
+          // JS edit: visible text must change in the SAME tab
           // Replace EVERY occurrence of the anchor, not just the first.
           // Anchors like "Open sidebar" appear in multiple spots inside a
           // single file (e.g. aria-label + visible text in JSX), and a
@@ -655,6 +1127,7 @@ for (const example of EXAMPLES) {
           } catch (err) {
             const state = await tab.evaluate<any>(domDiagnosticExpr())
             const tail = server!.output.slice(-3000)
+
             throw new Error(
               `JS marker "${jsMarker}" never reached the open tab.\n` +
                 `Page state: ${JSON.stringify(state, null, 2)}\n\n` +
@@ -662,28 +1135,32 @@ for (const example of EXAMPLES) {
             )
           }
 
-          // Steady-state must be exactly one user-extension root after the
-          // reinject settles. Two roots means the cleanup chain leaked a
-          // stale mount — the failure mode `template.content-reload` used to
-          // miss because `domContainsNeedleExpr` finds the marker as long as
-          // ANY root has it, regardless of whether the old root also exists.
+          // Steady-state must be exactly the template's designed root count
+          // after the reinject settles (one per declared content script).
+          // One more means the cleanup chain leaked a stale mount, the
+          // failure mode `template.content-reload` used to miss because
+          // `domContainsNeedleExpr` finds the marker as long as ANY root
+          // has it, regardless of whether the old root also exists. One
+          // fewer means the reinject swallowed a sibling script's mount.
           try {
             await expect
               .poll(() => tab.evaluate<number>(userRootCountExpr()), {
                 timeout: 15000,
                 intervals: [250, 500, 1000]
               })
-              .toBe(1)
+              .toBe(example.expectedRootCount)
           } catch (err) {
             const state = await tab.evaluate<any>(domDiagnosticExpr())
+
             throw new Error(
-              `Duplicate \`data-extension-root\` hosts after JS reinject — ` +
-                `expected exactly one user root.\n` +
+              `Wrong \`data-extension-root\` host count after JS reinject, ` +
+                `expected exactly ${example.expectedRootCount} user root(s), ` +
+                `one per declared content script.\n` +
                 `Page state: ${JSON.stringify(state, null, 2)}`
             )
           }
 
-          // ------- JS revert: original source restores the page text -------
+          // JS revert: original source restores the page text
           // Asserts the reload pipeline propagates *both* directions, not
           // just edits-add-new-text. Previously this was only a cleanup
           // step in afterAll, which silently masked one-way reload bugs
@@ -701,6 +1178,7 @@ for (const example of EXAMPLES) {
                   const hasAnchor = await tab.evaluate<boolean>(
                     domContainsNeedleExpr(example.jsAnchor.anchor)
                   )
+
                   return hasAnchor && !hasMarker
                 },
                 {timeout: 30000, intervals: [250, 500, 1000]}
@@ -708,7 +1186,7 @@ for (const example of EXAMPLES) {
               .toBe(true)
           }
 
-          // ------- JS syntax error: previous good state must be preserved --
+          // JS syntax error: previous good state must be preserved
           // Writing a parse error makes rspack fail the compile. The dev
           // pipeline must NOT crash, and the already-rendered tab must keep
           // showing the last successful build. This is the regression that
@@ -724,8 +1202,10 @@ for (const example of EXAMPLES) {
             const stillThere = await tab.evaluate<boolean>(
               domContainsNeedleExpr(example.jsAnchor.anchor)
             )
+
             if (!stillThere) {
               const tail = server!.output.slice(-3000)
+
               throw new Error(
                 `Anchor "${example.jsAnchor.anchor}" disappeared while ` +
                   `JS source had a parse error — recoverability broken.\n` +
@@ -734,7 +1214,7 @@ for (const example of EXAMPLES) {
             }
           }
 
-          // ------- JS post-fix recovery: fix + a new marker must land -----
+          // JS post-fix recovery: fix + a new marker must land
           // Confirms the dev watcher is still alive after the failed compile
           // and the reload pipeline picks the next successful build.
           {
@@ -750,9 +1230,7 @@ for (const example of EXAMPLES) {
             await expect
               .poll(
                 () =>
-                  tab.evaluate<boolean>(
-                    domContainsNeedleExpr(recoveryMarker)
-                  ),
+                  tab.evaluate<boolean>(domContainsNeedleExpr(recoveryMarker)),
                 {timeout: 30000, intervals: [250, 500, 1000]}
               )
               .toBe(true)
@@ -764,15 +1242,13 @@ for (const example of EXAMPLES) {
             await expect
               .poll(
                 () =>
-                  tab.evaluate<boolean>(
-                    domContainsNeedleExpr(recoveryMarker)
-                  ),
+                  tab.evaluate<boolean>(domContainsNeedleExpr(recoveryMarker)),
                 {timeout: 30000, intervals: [250, 500, 1000]}
               )
               .toBe(false)
           }
 
-          // ------- CSS edit: computed style must change in the SAME tab ----
+          // CSS edit: computed style must change in the SAME tab
           // Only examples with a plain (non-modules) stylesheet — CSS/SASS
           // modules hash class names at build time, making a static appended
           // rule unreliable. The JS edit above already covers modules-based
@@ -818,19 +1294,38 @@ for (const example of EXAMPLES) {
                   prop: cssProbe
                 })
               )
+
               // Browsers return custom-property values wrapped in
               // whitespace and quotes; normalize for the compare.
               return (value || '').replace(/['"\s]/g, '')
             }
 
-            await expect
-              .poll(readProbe, {
-                timeout: 30000,
-                intervals: [250, 500, 1000]
-              })
-              .toBe(cssMarker)
+            try {
+              await expect
+                .poll(readProbe, {
+                  timeout: 30000,
+                  intervals: [250, 500, 1000]
+                })
+                .toBe(cssMarker)
+            } catch (err) {
+              const matches = await tab.evaluate<any>(
+                styleDiagnosticExpr({
+                  className: 'content_script',
+                  prop: cssProbe
+                })
+              )
+              const state = await tab.evaluate<any>(domDiagnosticExpr())
+              const tail = server!.output.slice(-3000)
 
-            // ------- CSS syntax error: previous good state preserved ------
+              throw new Error(
+                `CSS probe ${cssProbe} never became "${cssMarker}".\n` +
+                  `Class matches: ${JSON.stringify(matches, null, 2)}\n` +
+                  `Page state: ${JSON.stringify(state, null, 2)}\n\n` +
+                  `Dev server output tail:\n${tail}`
+              )
+            }
+
+            // CSS syntax error: previous good state preserved
             // Append a broken rule to the original source. The rebuild
             // fails and the existing stylesheet stays in effect.
             const cssSyntaxBroken =
@@ -840,8 +1335,10 @@ for (const example of EXAMPLES) {
             fs.writeFileSync(example.styleTarget.file, cssSyntaxBroken, 'utf8')
             await new Promise((r) => setTimeout(r, 8000))
             const heldValue = await readProbe()
+
             if (heldValue !== cssMarker) {
               const tail = server!.output.slice(-3000)
+
               throw new Error(
                 `CSS custom prop ${cssProbe} (= ${cssMarker}) was lost ` +
                   `while CSS had a parse error — got ${JSON.stringify(
@@ -851,7 +1348,7 @@ for (const example of EXAMPLES) {
               )
             }
 
-            // ------- CSS post-fix recovery: fix + new value must land ----
+            // CSS post-fix recovery: fix + new value must land
             const recoveryProbe = `--reload-recovery-${Date.now()}-${Math.floor(
               Math.random() * 1e6
             )}`
@@ -871,32 +1368,40 @@ for (const example of EXAMPLES) {
                       prop: recoveryProbe
                     })
                   )
+
                   return (value || '').replace(/['"\s]/g, '')
                 },
                 {timeout: 30000, intervals: [250, 500, 1000]}
               )
               .toBe(recoveryValue)
 
-            // Same one-root invariant after the CSS-driven reinject.
+            // Same exact-count invariant after the CSS-driven reinject.
             try {
               await expect
                 .poll(() => tab.evaluate<number>(userRootCountExpr()), {
                   timeout: 15000,
                   intervals: [250, 500, 1000]
                 })
-                .toBe(1)
+                .toBe(example.expectedRootCount)
             } catch (err) {
               const state = await tab.evaluate<any>(domDiagnosticExpr())
+
               throw new Error(
-                `Duplicate \`data-extension-root\` hosts after CSS reinject — ` +
-                  `expected exactly one user root.\n` +
+                `Wrong \`data-extension-root\` host count after CSS reinject, ` +
+                  `expected exactly ${example.expectedRootCount} user root(s), ` +
+                  `one per declared content script.\n` +
                   `Page state: ${JSON.stringify(state, null, 2)}`
               )
             }
 
-            // ------- CSS revert: original source restores the style ------
+            // CSS revert: original source restores the style
             const revertBaseline = getLatestContentScriptMtime(example.dir)
-            fs.writeFileSync(example.styleTarget.file, originalCssSource!, 'utf8')
+            fs.writeFileSync(
+              example.styleTarget.file,
+              originalCssSource!,
+              'utf8'
+            )
+
             await waitForBundleNewerThan(example.dir, revertBaseline, 45000)
             await expect
               .poll(
@@ -907,6 +1412,7 @@ for (const example of EXAMPLES) {
                       prop: recoveryProbe
                     })
                   )
+
                   return (value || '').replace(/['"\s]/g, '')
                 },
                 {timeout: 30000, intervals: [250, 500, 1000]}

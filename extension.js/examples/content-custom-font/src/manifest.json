@@ -3,38 +3,33 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
-  "name": "Custom Fonts Content Example",
-  "description": "Content script example that loads custom web fonts. Demonstrates font files and web_accessible_resources setup.",
-  "icons": {
-    "16": "images/icon.png",
-    "32": "images/icon.png",
-    "48": "images/icon.png",
-    "64": "images/icon.png",
-    "128": "images/icon.png"
+  "firefox:browser_specific_settings": {
+    "gecko": {
+      "id": "content-custom-font@extension.js",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   },
-  "permissions": ["activeTab", "scripting"],
+  "name": "Custom Fonts Content Example",
+  "description": "Injects a badge rendered in a custom font into every web page you visit, with an options page that turns the custom font on and off.",
+  "icons": {
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "48": "images/icon-48.png",
+    "64": "images/icon-64.png",
+    "128": "images/icon-128.png"
+  },
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": false
+  },
+  "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "chromium:service_worker": "background.js",
     "firefox:scripts": ["background.js"]
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "fonts/*.woff2",
-        "fonts/*.woff",
-        "fonts/*.ttf",
-        "fonts/*.otf",
-        "fonts/static/*.ttf",
-        "fonts/static/*.otf",
-        "assets/*.woff2",
-        "assets/*.woff",
-        "assets/*.ttf",
-        "assets/*.otf"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

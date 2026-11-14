@@ -1,19 +1,19 @@
 [powered-image]: https://img.shields.io/badge/Powered%20by-Extension.js-0971fe
 [powered-url]: https://extension.js.org
 
-[![Powered by Extension.js][powered-image]][powered-url]
+![Powered by Extension.js][powered-image]
 
 # AI Sidebar (Claude / Anthropic) Example
 
-> React sidebar with Claude AI chat. Adds a side panel with a conversational interface powered by the Anthropic SDK.
+> Adds a sidebar panel where you can chat with Claude about the page you are viewing.
 
-![screenshot](./public/screenshot.png)
+![screenshot](./screenshot.png)
 
 **What you'll see**: A small React UI injected into any web page, isolated in a Shadow DOM so site styles don't bleed through.
 
-**How it works**: A content script mounts a React + TypeScript UI inside a Shadow DOM and applies scoped styles so the host page can't bleed through. Styles flow through Tailwind + PostCSS. UI is composed with Radix / shadcn primitives, lucide-react, Anthropic SDK.
+**How it works**: The manifest registers a side panel (`chromium:side_panel` / `firefox:sidebar_action`) that loads a React + TypeScript page bundled from `src/sidebar/`. A content script mounts a React + TypeScript UI inside a Shadow DOM and applies scoped styles so the host page can't bleed through. On Chromium the in-page pill opens the panel. Firefox only opens a sidebar from a toolbar gesture, so the gecko build renders the pill inert with a hint to use the toolbar icon instead. Styles flow through Tailwind + PostCSS. UI is composed with Radix / shadcn primitives, lucide-react.
 
-Conversational sidebar wired to the [Anthropic SDK](https://docs.anthropic.com/). Paste a key the first time you open the panel — it lives in `chrome.storage.local`, never leaves the device — and chat with Claude inline next to whatever page you're on. Shares its layout and shadcn/ui primitives with the `ai-chatgpt`, `ai-gemini`, and `ai-perplexity` siblings; only the SDK and brand accent change.
+Conversational sidebar wired to the [Anthropic SDK](https://docs.anthropic.com/). Paste a key the first time you open the panel (it lives in `chrome.storage.local` and never leaves the device) and chat with Claude inline next to whatever page you're on. Shares its layout and shadcn/ui primitives with the `ai-chatgpt`, `ai-gemini`, and `ai-perplexity` siblings; only the SDK and brand accent change.
 
 ## Try it locally
 
@@ -43,6 +43,11 @@ src/
 │   ├── scripts.ts
 │   └── styles.css
 ├── images/
+│   ├── icon-128.png
+│   ├── icon-16.png
+│   ├── icon-32.png
+│   ├── icon-48.png
+│   ├── icon-64.png
 │   └── icon.png
 ├── lib/
 │   ├── client.ts
@@ -59,25 +64,27 @@ src/
 
 ## Commands
 
+Cloned this repo instead? The examples ship without npm scripts, so run Extension.js directly from the example directory. Run `npm install` first when the example declares dependencies.
+
 ### dev
 
 Run the extension in development mode. Target a browser with `--browser`:
 
 ```bash
-npm run dev                 # Chromium (default)
-npm run dev -- --browser=chrome
-npm run dev -- --browser=edge
-npm run dev -- --browser=firefox
+npx extension@latest dev .                  # Chromium (default)
+npx extension@latest dev . --browser=chrome
+npx extension@latest dev . --browser=edge
+npx extension@latest dev . --browser=firefox
 ```
 
 ### build
 
-Build for production. Convenience scripts cover each browser:
+Build for production:
 
 ```bash
-npm run build           # Chrome (default)
-npm run build:firefox
-npm run build:edge
+npx extension@latest build .                # Chromium (default)
+npx extension@latest build . --browser=firefox
+npx extension@latest build . --browser=edge
 ```
 
 ### preview
@@ -85,7 +92,7 @@ npm run build:edge
 Preview the production build with the bundled browser:
 
 ```bash
-npm run preview
+npx extension@latest preview .
 ```
 
 ## Tests

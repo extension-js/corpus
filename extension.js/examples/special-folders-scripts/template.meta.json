@@ -1,0 +1,28 @@
+{
+  "tags": ["special-folders", "scripts", "javascript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Open any page for the overlay, then click the toolbar icon for the popup",
+    "Add a file under scripts/ and it ships as its own bundle"
+  ],
+  "useCases": [
+    "Scripts shared between a popup and a content script",
+    "Standalone script bundles without manifest plumbing",
+    "Reference for the scripts/ special folder convention"
+  ],
+  "docsUrl": "https://extension.js.org/docs/features/special-folders",
+  "video": "P8Q8TDQqbQE",
+  "store": {
+    "summary": "Runs bundled scripts from a toolbar popup.",
+    "justifications": {
+      "activeTab": "Grants temporary access to the page the user is on when they invoke the extension, so it can act on that page only.",
+      "scripting": "Injects the extension's content script that renders its on-page interface.",
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the special-folders-scripts template. Not yet submitted to any store."
+    ]
+  }
+}

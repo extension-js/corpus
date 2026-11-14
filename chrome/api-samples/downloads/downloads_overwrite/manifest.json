@@ -1,0 +1,10 @@
+{
+  "name": "Overwrite existing downloads",
+  "description": "Uses the chrome.downloads.onDeterminingFilename handler to overwrite existing files instead of adding (1), (2), etc.",
+  "version": "0.1",
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "permissions": ["downloads"],
+  "manifest_version": 3
+}

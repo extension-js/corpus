@@ -1,0 +1,23 @@
+{
+  "tags": ["new-tab", "svelte", "typescript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Open a new tab to see the Svelte page this template ships",
+    "Edit src/newtab/NewTabApp.svelte and save to watch it update"
+  ],
+  "useCases": [
+    "A new tab page rendered by Svelte",
+    "Svelte components compiled with no extra config",
+    "Starting point for Svelte extensions with a new tab"
+  ],
+  "docsUrl": "https://extension.js.org/docs/languages-and-frameworks/svelte",
+  "video": "uq-HVZb51U8",
+  "store": {
+    "summary": "Replaces your new tab page with a simple Svelte page.",
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the new-svelte template. Not yet submitted to any store."
+    ]
+  }
+}

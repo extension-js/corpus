@@ -1,0 +1,28 @@
+{
+  "title": "Content scripts with Sass modules",
+  "tags": ["content", "sass", "css-modules", "options", "storage"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Click Open options on the badge injected into the page",
+    "Tick the setting and watch the badge move to the left edge"
+  ],
+  "useCases": [
+    "A badge injected into every page and styled with hashed Sass module class names",
+    "One position setting shared between an options page and a content script",
+    "Starting point for Sass module content scripts that need preferences"
+  ],
+  "docsUrl": "https://extension.js.org/docs/languages-and-frameworks/sass",
+  "video": "Ma9f_Q1C7Eo",
+  "store": {
+    "summary": "Injects a small styled badge into web pages, with an options page that moves it to either edge.",
+    "justifications": {
+      "storage": "keeps the one setting so it survives closing the page and restarting the browser, and so the content script can read the same value the options page wrote. Nothing leaves the browser.",
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-sass-modules template. Not yet submitted to any store."
+    ]
+  }
+}

@@ -1,20 +1,16 @@
 {
   "private": true,
   "name": "svelte",
-  "description": "Svelte-based extension with sidebar panel",
+  "description": "Adds a sidebar panel to the browser with a simple Svelte page.",
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "author": {
-    "name": "Cezar Augusto",
-    "email": "boss@cezaraugusto.net",
-    "url": "https://cezaraugusto.com"
-  },
   "dependencies": {
     "svelte": "^5.15.0"
   },
   "devDependencies": {
     "@tsconfig/svelte": "5.0.4",
-    "typescript": "5.3.3"
+    "@types/chrome": "^0.0.287",
+    "typescript": "7.0.2"
   }
 }

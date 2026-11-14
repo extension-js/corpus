@@ -3,16 +3,23 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
-  "name": ".env Content Example",
-  "description": "Content script example that reads environment variables (.env) and renders a small UI.",
-  "icons": {
-    "16": "images/icon.png",
-    "32": "images/icon.png",
-    "48": "images/icon.png",
-    "64": "images/icon.png",
-    "128": "images/icon.png"
+  "firefox:browser_specific_settings": {
+    "gecko": {
+      "id": "content-env@extension.js",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   },
-  "permissions": ["activeTab", "scripting"],
+  "name": ".env Content Example",
+  "description": "Injects a small panel showing the extension's environment values into every web page you visit.",
+  "icons": {
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "48": "images/icon-48.png",
+    "64": "images/icon-64.png",
+    "128": "images/icon-128.png"
+  },
   "host_permissions": ["<all_urls>"],
   "background": {
     "chromium:service_worker": "background.ts",

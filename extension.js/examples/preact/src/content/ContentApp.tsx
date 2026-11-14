@@ -1,13 +1,34 @@
 import {h} from 'preact'
 import logo from '../images/icon.png'
+// Named one by one so the bundler can fold each build down to a single
+// branch. waterfox and librewolf are gecko, and used to fall to chromium.
+const isFirefoxLike =
+  import.meta.env.EXTENSION_PUBLIC_BROWSER === 'firefox' ||
+  import.meta.env.EXTENSION_PUBLIC_BROWSER === 'waterfox' ||
+  import.meta.env.EXTENSION_PUBLIC_BROWSER === 'librewolf' ||
+  import.meta.env.EXTENSION_PUBLIC_BROWSER === 'gecko-based'
 
 export default function ContentApp() {
   const handleClick = () => {
-    if (import.meta.env.EXTENSION_PUBLIC_BROWSER === 'firefox') {
-      browser.runtime.sendMessage({type: 'openSidebar'})
-    } else {
-      chrome.runtime.sendMessage({type: 'openSidebar'})
-    }
+    chrome.runtime.sendMessage({type: 'openSidebar'})
+  }
+
+  // Firefox cannot open a sidebar from a message listener, so the gecko build
+  // renders a hint naming the toolbar action instead of a control that cannot work.
+  if (isFirefoxLike) {
+    return (
+      <div className="content_pill content_pill_static">
+        <img
+          className="content_pill_logo"
+          src={logo}
+          alt=""
+          aria-hidden="true"
+        />
+        <span className="content_pill_text">
+          Use the toolbar icon to open the sidebar
+        </span>
+      </div>
+    )
   }
 
   return (

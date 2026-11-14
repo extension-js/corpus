@@ -3,33 +3,45 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
+  "firefox:browser_specific_settings": {
+    "gecko": {
+      "id": "ai-gemini@extension.js",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "personalCommunications",
+          "websiteContent"
+        ]
+      }
+    }
+  },
   "name": "Gemini (Google) Sidebar",
   "author": "Cezar Augusto",
-  "description": "React sidebar with Gemini chat. Adds a side panel with a conversational interface powered by the Google Generative AI SDK.",
+  "description": "Adds a sidebar panel where you can chat with Gemini about the page you are viewing.",
   "icons": {
-    "16": "images/icon.png",
-    "32": "images/icon.png",
-    "48": "images/icon.png",
-    "64": "images/icon.png",
-    "128": "images/icon.png"
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "48": "images/icon-48.png",
+    "64": "images/icon-64.png",
+    "128": "images/icon-128.png"
   },
   "chromium:action": {
     "default_icon": {
-      "16": "images/icon.png",
-      "32": "images/icon.png",
-      "48": "images/icon.png",
-      "64": "images/icon.png",
-      "128": "images/icon.png"
+      "16": "images/icon-16.png",
+      "32": "images/icon-32.png",
+      "48": "images/icon-48.png",
+      "64": "images/icon-64.png",
+      "128": "images/icon-128.png"
     },
     "default_title": "Open Gemini Sidebar"
   },
   "firefox:browser_action": {
     "default_icon": {
-      "16": "images/icon.png",
-      "32": "images/icon.png",
-      "48": "images/icon.png",
-      "64": "images/icon.png",
-      "128": "images/icon.png"
+      "16": "images/icon-16.png",
+      "32": "images/icon-32.png",
+      "48": "images/icon-48.png",
+      "64": "images/icon-64.png",
+      "128": "images/icon-128.png"
     },
     "default_title": "Open Gemini Sidebar"
   },
@@ -39,16 +51,11 @@
   },
   "firefox:sidebar_action": {
     "default_panel": "sidebar/index.html",
-    "default_title": "Gemini Sidebar"
+    "default_title": "Gemini Sidebar",
+    "browser_style": false
   },
-  "chromium:permissions": [
-    "sidePanel",
-    "storage",
-    "activeTab",
-    "scripting",
-    "tabs"
-  ],
-  "firefox:permissions": ["storage", "activeTab", "tabs"],
+  "chromium:permissions": ["sidePanel", "storage", "tabs"],
+  "firefox:permissions": ["storage", "tabs"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "chromium:service_worker": "background.ts",

@@ -1,16 +1,12 @@
 {
   "private": true,
   "name": "content-typescript",
-  "description": "Content script example built with TypeScript. Mounts a small UI and uses typed modules.",
+  "description": "Shows a small overlay UI on every web page, with an options page that moves it from right to left.",
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "author": {
-    "name": "Cezar Augusto",
-    "email": "boss@cezaraugusto.net",
-    "url": "https://cezaraugusto.com"
-  },
   "devDependencies": {
-    "typescript": "5.3.3"
+    "@types/chrome": "^0.0.287",
+    "typescript": "7.0.2"
   }
 }

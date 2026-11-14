@@ -1,4 +1,5 @@
 .content_script {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: #c9c9c9;
   background-color: #0a0c10;
   position: fixed;
@@ -39,4 +40,19 @@
   border-bottom: 2px solid #c9c9c9;
   color: #e5e7eb;
   margin: 0;
+}
+
+.content_button {
+  font: inherit;
+  font-size: small;
+  color: #e5e7eb;
+  background-color: #11151c;
+  border: 1px solid #2a3140;
+  border-radius: 6px;
+  padding: 0.6em 1em;
+  cursor: pointer;
+}
+
+.content_button:hover {
+  background-color: #182030;
 }

@@ -1,3 +1,29 @@
 {
-  "featured": true
+  "featured": true,
+  "tags": ["content", "options", "storage", "less"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Click Open options on the badge injected into the page",
+    "Tick the setting and watch the badge move to the left edge"
+  ],
+  "useCases": [
+    "A Less-styled badge injected into every page",
+    "One position setting shared between an options page and a content script",
+    "Starting point for Less extensions that need preferences"
+  ],
+  "docsUrl": "https://extension.js.org/docs/languages-and-frameworks/less",
+  "video": "VGssDbxBeMM",
+  "store": {
+    "summary": "Injects a small styled badge into web pages, with a Less options page that moves it to either edge.",
+    "justifications": {
+      "storage": "keeps the one setting so it survives closing the page and restarting the browser, and so the content script can read the same value the options page wrote. Nothing leaves the browser.",
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "reviewerHints": "Start by opening any page, then click Open options on the badge and tick the setting to watch the badge move to the left edge.",
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-less template. Not yet submitted to any store."
+    ]
+  }
 }

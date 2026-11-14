@@ -3,33 +3,41 @@
   "chromium:manifest_version": 3,
   "firefox:manifest_version": 2,
   "version": "1.0.0",
+  "firefox:browser_specific_settings": {
+    "gecko": {
+      "id": "sidebar-shadcn@extension.js",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "name": "React Sidebar Example",
   "author": "Cezar Augusto",
-  "description": "React sidebar example using shadcn/ui components. Adds a sidebar panel with a simple React page.",
+  "description": "Adds a sidebar panel to the browser built with shadcn/ui components.",
   "icons": {
-    "16": "images/icon.png",
-    "32": "images/icon.png",
-    "48": "images/icon.png",
-    "64": "images/icon.png",
-    "128": "images/icon.png"
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "48": "images/icon-48.png",
+    "64": "images/icon-64.png",
+    "128": "images/icon-128.png"
   },
   "chromium:action": {
     "default_icon": {
-      "16": "images/icon.png",
-      "32": "images/icon.png",
-      "48": "images/icon.png",
-      "64": "images/icon.png",
-      "128": "images/icon.png"
+      "16": "images/icon-16.png",
+      "32": "images/icon-32.png",
+      "48": "images/icon-48.png",
+      "64": "images/icon-64.png",
+      "128": "images/icon-128.png"
     },
     "default_title": "Open Extension.js Shadcn Sidebar"
   },
   "firefox:browser_action": {
     "default_icon": {
-      "16": "images/icon.png",
-      "32": "images/icon.png",
-      "48": "images/icon.png",
-      "64": "images/icon.png",
-      "128": "images/icon.png"
+      "16": "images/icon-16.png",
+      "32": "images/icon-32.png",
+      "48": "images/icon-48.png",
+      "64": "images/icon-64.png",
+      "128": "images/icon-128.png"
     },
     "default_title": "Open Extension.js Shadcn Sidebar"
   },
@@ -39,11 +47,18 @@
   },
   "firefox:sidebar_action": {
     "default_panel": "sidebar/index.html",
-    "default_title": "Extension.js Shadcn Sidebar Panel"
+    "default_title": "Extension.js Shadcn Sidebar Panel",
+    "browser_style": false
   },
   "chromium:permissions": ["sidePanel"],
   "background": {
     "chromium:service_worker": "background.ts",
     "firefox:scripts": ["background.ts"]
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/scripts.tsx"]
+    }
+  ]
 }

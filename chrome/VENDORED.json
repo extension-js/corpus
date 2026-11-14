@@ -3,8 +3,8 @@
   "name": "GoogleChrome chrome-extensions-samples",
   "repo": "https://github.com/GoogleChrome/chrome-extensions-samples",
   "ref": "main",
-  "sha": "c4393862e164d74d1b6112ced19f2a2bbe26506c",
-  "vendoredAt": "2026-07-16T14:18:03.264Z",
+  "sha": "657a9416588676fdd5cf22041651d0663bffaba2",
+  "vendoredAt": "2026-11-14T21:13:32.336Z",
   "scan": [
     "api-samples",
     "functional-samples"
@@ -19,7 +19,7 @@
     "_archive",
     ".github"
   ],
-  "treeHash": "ede7a263552e7d86",
-  "files": 3224,
-  "bytes": 50205854
+  "treeHash": "90c9365870294f7a",
+  "files": 3271,
+  "bytes": 49835413
 }

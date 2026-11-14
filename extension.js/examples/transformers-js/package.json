@@ -1,17 +1,19 @@
 {
   "private": true,
   "name": "transformers-js",
-  "description": "Transformers.js demo with a sidebar and a content script: classify the active page or your selection on-device via WebGPU/WASM.",
+  "description": "Adds a sidebar panel that classifies the active page or your selected text with on-device AI models.",
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "author": {
-    "name": "Cezar Augusto",
-    "email": "boss@cezaraugusto.net",
-    "url": "https://cezaraugusto.com"
-  },
   "dependencies": {
     "@huggingface/transformers": "3.7.1"
+  },
+  "overrides": {
+    "sharp": "npm:empty-npm-package@1.0.0",
+    "onnxruntime-node": "npm:empty-npm-package@1.0.0"
+  },
+  "allowScripts": {
+    "protobufjs": false
   },
   "devDependencies": {}
 }

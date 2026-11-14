@@ -6,7 +6,7 @@
   "timeToFirstSuccessMinutes": 3,
   "firstSteps": [
     "Run npm run dev to launch the extension",
-    "Open any page — three separate content scripts inject small elements",
+    "Open any page and three separate content scripts inject small elements",
     "Edit any of the entries in src/content/ to see HMR update independently"
   ],
   "useCases": [
@@ -14,5 +14,15 @@
     "Target different page contexts with focused, independent bundles",
     "Reference for the multi-entry content_scripts pattern in MV3"
   ],
-  "docsUrl": "https://extension.js.org/docs/implementation-guide/content-scripts"
+  "docsUrl": "https://extension.js.org/docs/implementation-guide/content-scripts",
+  "video": "oDcdmGaIBjw",
+  "store": {
+    "summary": "Injects four small elements into web pages.",
+    "justifications": {
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-multi-three-entries template. Not yet submitted to any store."
+    ]
+  }
 }

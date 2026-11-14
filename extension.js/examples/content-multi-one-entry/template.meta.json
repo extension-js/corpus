@@ -1,0 +1,26 @@
+{
+  "tags": ["content-scripts", "multi-entry", "javascript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Open any web page and an element appears in each of its four corners",
+    "Edit one script in src/content/ and save to see that corner update"
+  ],
+  "useCases": [
+    "Four scripts shipped from a single content-script entry",
+    "One match rule driving several focused files",
+    "Reference for grouping content scripts under one entry"
+  ],
+  "docsUrl": "https://extension.js.org/docs/implementation-guide/content-scripts",
+  "video": "l1QWq7lIKo8",
+  "store": {
+    "summary": "Injects four small elements into web pages.",
+    "justifications": {
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-multi-one-entry template. Not yet submitted to any store."
+    ]
+  }
+}

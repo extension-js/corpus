@@ -1,3 +1,28 @@
 {
-  "featured": true
+  "featured": true,
+  "tags": ["sidebar", "typescript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Click the extension icon to open the sidebar panel",
+    "Edit the typed sources in src/sidebar/ to watch the panel update"
+  ],
+  "useCases": [
+    "A typed sidebar extension with no compiler config",
+    "TypeScript compiled by Extension.js out of the box",
+    "Starting point for TypeScript extensions"
+  ],
+  "docsUrl": "https://extension.js.org/docs/getting-started/templates/typescript",
+  "video": "UX91cqUH2DU",
+  "store": {
+    "summary": "Adds a sidebar panel to the browser.",
+    "justifications": {
+      "sidePanel": "Renders the extension's main interface in the browser side panel.",
+      "Content script match <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the typescript template. Not yet submitted to any store."
+    ]
+  }
 }

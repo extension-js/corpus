@@ -1,19 +1,21 @@
 [powered-image]: https://img.shields.io/badge/Powered%20by-Extension.js-0971fe
 [powered-url]: https://extension.js.org
 
-[![Powered by Extension.js][powered-image]][powered-url]
+![Powered by Extension.js][powered-image]
 
 # Special Folders (Pages) Example
 
-> Opens a welcome page on extension load, showcasing the pages/ folder.
+> Opens a welcome page in a new tab when the extension loads.
 
-![screenshot](./public/screenshot.png)
+![screenshot](./screenshot.png)
 
 **What you'll see**: A welcome page that opens on install / startup, served from `pages/`.
 
-**How it works**: Files inside `pages/` are treated as auto-discovered entrypoints — no `manifest.json` wiring required. The background script opens one of them on install / startup.
+**How it works**: Files inside `pages/` are treated as auto-discovered entrypoints , with no `manifest.json` wiring required. The background script opens one of them on install / startup.
 
 Demonstrates Extension.js's **`pages/`** convention: every HTML file inside the project-root `pages/` directory becomes an entrypoint without manifest wiring. The background script opens `pages/welcome.html` on install / startup.
+
+**On Safari**: the `sandbox/` page does not run. Safari has no sandboxed extension pages, so a Safari build drops the `sandbox` key and the page it points at never loads.
 
 ## Try it locally
 
@@ -32,9 +34,13 @@ A fresh browser window opens with the extension already loaded.
 .
 ├── src/
 │   ├── images/
-│   │   ├── icon.png
-│   │   └── javascript.png
+│   │   ├── icon-128.png
+│   │   ├── icon-16.png
+│   │   ├── icon-32.png
+│   │   ├── icon-48.png
+│   │   └── icon-64.png
 │   ├── sandbox/
+│   │   ├── eval.js
 │   │   ├── index.html
 │   │   ├── scripts.js
 │   │   └── styles.css
@@ -49,25 +55,27 @@ A fresh browser window opens with the extension already loaded.
 
 ## Commands
 
+Cloned this repo instead? The examples ship without npm scripts, so run Extension.js directly from the example directory. Run `npm install` first when the example declares dependencies.
+
 ### dev
 
 Run the extension in development mode. Target a browser with `--browser`:
 
 ```bash
-npm run dev                 # Chromium (default)
-npm run dev -- --browser=chrome
-npm run dev -- --browser=edge
-npm run dev -- --browser=firefox
+npx extension@latest dev .                  # Chromium (default)
+npx extension@latest dev . --browser=chrome
+npx extension@latest dev . --browser=edge
+npx extension@latest dev . --browser=firefox
 ```
 
 ### build
 
-Build for production. Convenience scripts cover each browser:
+Build for production:
 
 ```bash
-npm run build           # Chrome (default)
-npm run build:firefox
-npm run build:edge
+npx extension@latest build .                # Chromium (default)
+npx extension@latest build . --browser=firefox
+npx extension@latest build . --browser=edge
 ```
 
 ### preview
@@ -75,7 +83,7 @@ npm run build:edge
 Preview the production build with the bundled browser:
 
 ```bash
-npm run preview
+npx extension@latest preview .
 ```
 
 ## Tests

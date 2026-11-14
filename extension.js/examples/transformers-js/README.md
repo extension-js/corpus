@@ -1,19 +1,19 @@
 [powered-image]: https://img.shields.io/badge/Powered%20by-Extension.js-0971fe
 [powered-url]: https://extension.js.org
 
-[![Powered by Extension.js][powered-image]][powered-url]
+![Powered by Extension.js][powered-image]
 
 # Transformers.js Example
 
-> Transformers.js demo with a sidebar and a content script: classify the active page or your selection on-device via WebGPU/WASM.
+> Adds a sidebar panel that classifies the active page or your selected text with on-device AI models.
 
-![screenshot](./public/screenshot.png)
+![screenshot](./screenshot.png)
 
-**What you'll see**: A side panel where you can type text, pull the active page's text, or use your current selection — and run a Transformers.js pipeline on it. A right-click context menu also exposes "Classify selection with Transformers.js".
+**What you'll see**: A side panel that runs 🤗 Transformers in your browser: type in the text box and the classification appears below it when you pause, or press Enter.
 
-**How it works**: The manifest registers a side panel (`chromium:side_panel` / `firefox:sidebar_action`) and a content script that listens for `getPageContext` / `getSelection` messages. The background service worker relays those requests to the active tab and runs the pipeline; results stream back to the sidebar.
+**How it works**: The same demo as the [Transformers.js browser extension sample](https://github.com/huggingface/transformers.js-examples/tree/main/browser-extension), built with Extension.js: a service worker loads a `text-classification` pipeline once, the panel sends it text over `runtime.sendMessage`, and the result prints as JSON. The panel adds what an extension needs on top of that sample: a button that classifies the active page text or your selection (read by the content script and relayed by the service worker), a right-click menu that classifies selected text, and model settings persisted in `storage.sync`, one cached pipeline per configuration.
 
-Runs [Transformers.js](https://huggingface.co/docs/transformers.js) models in the browser via WebGPU/WASM. No server, no API key — the model and tokenizer are loaded from the Hugging Face Hub on first run.
+Runs [Transformers.js](https://huggingface.co/docs/transformers.js) pipelines with no server and no API key: the model and tokenizer are loaded from the Hugging Face Hub on first run, and inference happens locally via WebGPU/WASM. One manifest builds for Chrome, Edge and Firefox, where `chromium:` and `firefox:` prefixed keys pick the side panel surface and manifest version for each browser. The production build ships the onnxruntime WebAssembly core (about 21 MiB) at the output root, so `extension.config.js` declares `runtime` and `service-worker` budgets sized for the model runtime and `extension build` finishes without a performance warning.
 
 ## Try it locally
 
@@ -30,10 +30,15 @@ A fresh browser window opens with the extension already loaded.
 
 ```
 src/
-├── images/
-│   └── icon.png
 ├── content/
 │   └── scripts.js
+├── images/
+│   ├── icon-128.png
+│   ├── icon-16.png
+│   ├── icon-32.png
+│   ├── icon-48.png
+│   ├── icon-64.png
+│   └── icon.png
 ├── sidebar/
 │   ├── index.html
 │   ├── sakura.css
@@ -47,25 +52,27 @@ src/
 
 ## Commands
 
+Cloned this repo instead? The examples ship without npm scripts, so run Extension.js directly from the example directory. Run `npm install` first when the example declares dependencies.
+
 ### dev
 
 Run the extension in development mode. Target a browser with `--browser`:
 
 ```bash
-npm run dev                 # Chromium (default)
-npm run dev -- --browser=chrome
-npm run dev -- --browser=edge
-npm run dev -- --browser=firefox
+npx extension@latest dev .                  # Chromium (default)
+npx extension@latest dev . --browser=chrome
+npx extension@latest dev . --browser=edge
+npx extension@latest dev . --browser=firefox
 ```
 
 ### build
 
-Build for production. Convenience scripts cover each browser:
+Build for production:
 
 ```bash
-npm run build           # Chrome (default)
-npm run build:firefox
-npm run build:edge
+npx extension@latest build .                # Chromium (default)
+npx extension@latest build . --browser=firefox
+npx extension@latest build . --browser=edge
 ```
 
 ### preview
@@ -73,7 +80,7 @@ npm run build:edge
 Preview the production build with the bundled browser:
 
 ```bash
-npm run preview
+npx extension@latest preview .
 ```
 
 ## Tests

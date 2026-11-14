@@ -1,7 +1,21 @@
 import './styles.css'
+import {useEffect, useState} from 'react'
 import reactLogo from '../images/icon.png'
+import {watchPageTitle} from './page-title'
+
+const NO_PAGE_TEXT = 'Open a web page to see its title here.'
 
 export default function SidebarApp() {
+  const [pageTitle, setPageTitle] = useState(NO_PAGE_TEXT)
+
+  useEffect(
+    () =>
+      watchPageTitle((answer) => {
+        setPageTitle(answer ? answer.title : NO_PAGE_TEXT)
+      }),
+    []
+  )
+
   return (
     <div className="sidebar_app">
       <header>
@@ -21,9 +35,9 @@ export default function SidebarApp() {
             className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
           >
             Extension.js docs
-          </a>
-          .
+          </a>.
         </p>
+        <p className="sidebar_page_title">{pageTitle}</p>
       </header>
     </div>
   )

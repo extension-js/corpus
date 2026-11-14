@@ -1,0 +1,26 @@
+{
+  "tags": ["content-scripts", "env", "configuration", "typescript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Open any web page to see the panel print the injected values",
+    "Edit .env.chrome or .env.firefox to change what the panel reads"
+  ],
+  "useCases": [
+    "Reading build-time configuration inside a content script",
+    "Switching behavior per browser without touching the source",
+    "Reference for EXTENSION_PUBLIC_* values in typed sources"
+  ],
+  "docsUrl": "https://extension.js.org/docs/features/environment-variables",
+  "video": "Q-ugTIZVZ-U",
+  "store": {
+    "summary": "Injects a panel with the extension's environment values.",
+    "justifications": {
+      "Host permission <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting."
+    },
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-env template. Not yet submitted to any store."
+    ]
+  }
+}

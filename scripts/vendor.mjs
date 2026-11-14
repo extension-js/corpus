@@ -30,8 +30,9 @@ import {ROOT, CACHE_DIR, loadSources, exec, readJson, writeJson, fs, path} from 
 const LOCK = path.join(ROOT, 'sources.lock.json')
 // Never legitimately part of a sample; pruned at any depth.
 const PRUNE_ANY = new Set(['.git', 'node_modules'])
-// OS noise: never copied, never hashed (a local Finder visit must not flip --check).
-const IGNORE_FILES = new Set(['.DS_Store', 'VENDORED.json'])
+// OS noise and per-developer tool config: never copied, never hashed (a local
+// Finder visit must not flip --check, and tool config is not sample content).
+const IGNORE_FILES = new Set(['.DS_Store', 'VENDORED.json', '.mcp.json'])
 
 const argv = process.argv.slice(2)
 const CHECK = argv.includes('--check')

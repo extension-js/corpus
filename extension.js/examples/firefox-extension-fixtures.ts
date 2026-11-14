@@ -1,19 +1,3 @@
-// Firefox extension test fixtures using Playwright + Firefox RDP
-//
-// Strategy:
-// 1. Launch Firefox via Playwright's firefox.launchPersistentContext with
-//    a temp profile that has remote debugging enabled
-// 2. Pass -start-debugger-server <port> to open the RDP socket
-// 3. Connect a minimal RDP client and call installTemporaryAddon
-// 4. Discover the moz-extension:// UUID from the profile's prefs.js
-// 5. Expose page + extensionId (UUID) for Playwright assertions
-//
-// Limitation: Playwright's Juggler protocol cannot navigate to
-// moz-extension:// URLs, and the patched Firefox RDP does not expose
-// addon debugging (webExtensionDescriptor has no getTarget). Therefore
-// extension page rendering is verified via built HTML content on disk,
-// while content scripts are verified at runtime via Playwright.
-
 import {
   test as base,
   firefox,
@@ -25,12 +9,11 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 
-// ---------------------------------------------------------------------------
 // Minimal RDP client — just enough for installTemporaryAddon + listTabs
-// ---------------------------------------------------------------------------
 
 function buildRdpFrame(obj: unknown): string {
   const body = JSON.stringify(obj)
+
   return `${Buffer.byteLength(body)}:${body}`
 }
 
@@ -47,16 +30,19 @@ class RdpClient {
             this.socket = s
             s.on('data', (chunk) => {
               this.buffer = Buffer.concat([this.buffer, chunk])
+
               if (this.dataResolve) {
                 const fn = this.dataResolve
                 this.dataResolve = null
                 fn()
               }
             })
+
             resolve()
           })
           s.once('error', reject)
         })
+
         return
       } catch {
         if (i < retries - 1) {
@@ -64,6 +50,7 @@ class RdpClient {
         }
       }
     }
+
     throw new Error(`Failed to connect to Firefox RDP on port ${port}`)
   }
 
@@ -71,29 +58,35 @@ class RdpClient {
     const str = this.buffer.toString()
     const sep = str.indexOf(':')
     if (sep < 1) return null
+
     const len = parseInt(str.substring(0, sep), 10)
     if (isNaN(len)) return null
+
     const byteOffset = Buffer.byteLength(str.substring(0, sep + 1))
     if (this.buffer.length - byteOffset < len) return null
+
     const msg = this.buffer.slice(byteOffset, byteOffset + len)
     this.buffer = this.buffer.slice(byteOffset + len)
+
     return JSON.parse(msg.toString())
   }
 
   private async readOneMessage(timeoutMs = 8000): Promise<any> {
     const deadline = Date.now() + timeoutMs
+
     while (Date.now() < deadline) {
       const msg = this.tryParse()
       if (msg) return msg
+
       await new Promise<void>((resolve) => {
         this.dataResolve = resolve
         setTimeout(resolve, 100)
       })
     }
+
     throw new Error('RDP read timeout')
   }
 
-  /** Consume the initial welcome packet Firefox sends on connect */
   async consumeWelcome(): Promise<any> {
     return this.readOneMessage()
   }
@@ -102,24 +95,52 @@ class RdpClient {
     this.socket.write(buildRdpFrame(payload))
     // Read messages, skipping unsolicited events from other actors
     const deadline = Date.now() + 8000
+
     while (Date.now() < deadline) {
       const msg = await this.readOneMessage(
         Math.max(deadline - Date.now(), 500)
       )
+
       if (msg.from === payload.to || !msg.type || payload.to === 'root') {
         return msg
       }
     }
+
     throw new Error(
       `RDP request timeout waiting for response from ${payload.to}`
     )
   }
 
-  /** Drain any unsolicited messages (events) from the buffer */
   drainEvents(): void {
     while (this.tryParse()) {
       // discard
     }
+  }
+
+  // evaluateJSAsync first returns a typeless resultID ack. Wait for the
+  // typed evaluationResult; request() would return the ack.
+  async evaluate(consoleActor: string, text: string): Promise<any> {
+    this.socket.write(
+      buildRdpFrame({to: consoleActor, type: 'evaluateJSAsync', text})
+    )
+
+    const deadline = Date.now() + 8000
+
+    while (Date.now() < deadline) {
+      const msg = await this.readOneMessage(
+        Math.max(deadline - Date.now(), 300)
+      )
+
+      if (msg.from !== consoleActor || msg.type !== 'evaluationResult') continue
+
+      if (msg.hasException) {
+        throw new Error(msg.exceptionMessage || 'Firefox RDP evaluation threw')
+      }
+
+      return msg.result
+    }
+
+    throw new Error('RDP evaluationResult timeout')
   }
 
   disconnect(): void {
@@ -131,9 +152,7 @@ class RdpClient {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Port allocation
-// ---------------------------------------------------------------------------
 
 function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -142,13 +161,12 @@ function getFreePort(): Promise<number> {
       const addr = srv.address() as net.AddressInfo
       srv.close(() => resolve(addr.port))
     })
+
     srv.on('error', reject)
   })
 }
 
-// ---------------------------------------------------------------------------
 // UUID discovery — reads prefs.js after addon install
-// ---------------------------------------------------------------------------
 
 async function getExtensionUuid(
   profileDir: string,
@@ -159,11 +177,13 @@ async function getExtensionUuid(
   for (let i = 0; i < maxRetries; i++) {
     try {
       const prefsPath = path.join(profileDir, 'prefs.js')
+
       if (fs.existsSync(prefsPath)) {
         const content = fs.readFileSync(prefsPath, 'utf8')
         const uuidMatch = content.match(
           /user_pref\("extensions\.webextensions\.uuids",\s*"(.+?)"\)/
         )
+
         if (uuidMatch) {
           // Value is escaped JSON: {\"addon-id\":\"uuid\", ...}
           const jsonStr = uuidMatch[1].replace(/\\"/g, '"')
@@ -174,31 +194,32 @@ async function getExtensionUuid(
     } catch {
       // prefs.js may not exist yet or may be partially written
     }
+
     await new Promise((r) => setTimeout(r, delayMs))
   }
+
   return undefined
 }
 
-// ---------------------------------------------------------------------------
 // Firefox build path resolution
-// ---------------------------------------------------------------------------
 
 export function resolveBuiltFirefoxExtensionPath(
   exampleDirAbsolute: string
 ): string {
   const roots = ['dist', 'build', '.extension']
+
   for (const root of roots) {
     const dir = path.join(exampleDirAbsolute, root, 'firefox')
+
     if (fs.existsSync(dir) && fs.existsSync(path.join(dir, 'manifest.json'))) {
       return dir
     }
   }
+
   return path.join(exampleDirAbsolute, 'dist', 'firefox')
 }
 
-// ---------------------------------------------------------------------------
 // Firefox master preferences for test profile
-// ---------------------------------------------------------------------------
 
 const firefoxTestPrefs: Record<string, string | number | boolean> = {
   // Remote debugging
@@ -242,9 +263,7 @@ const firefoxTestPrefs: Record<string, string | number | boolean> = {
   'extensions.getAddons.cache.enabled': false
 }
 
-// ---------------------------------------------------------------------------
 // RDP helpers
-// ---------------------------------------------------------------------------
 
 export interface RdpTab {
   actor: string
@@ -253,18 +272,152 @@ export interface RdpTab {
   outerWindowID?: number
 }
 
-/**
- * List tabs via RDP. Returns tab descriptors including moz-extension:// pages.
- */
 export async function rdpListTabs(rdpClient: RdpClient): Promise<RdpTab[]> {
   rdpClient.drainEvents()
   const response = await rdpClient.request({to: 'root', type: 'listTabs'})
+
   return (response?.tabs || []) as RdpTab[]
 }
 
-// ---------------------------------------------------------------------------
+export interface RdpRenderedPage {
+  href: string
+  title: string
+  text: string
+}
+
+async function navigateTab(
+  rdpClient: RdpClient,
+  tabActor: string,
+  url: string
+): Promise<void> {
+  const target = await rdpClient.request({to: tabActor, type: 'getTarget'})
+  const frameActor = target?.frame?.actor
+
+  if (!frameActor) {
+    throw new Error('Firefox tab target has no windowGlobal actor')
+  }
+
+  try {
+    await rdpClient.request({to: frameActor, type: 'navigateTo', url})
+  } catch {
+    // The packet is empty. The load still proceeds.
+  }
+}
+
+// Juggler cannot open moz-extension:// pages, so the tab's windowGlobal
+// target loads the page over RDP and evaluateJSAsync reads what it rendered.
+// This always navigates the first tab. A page that must stay open uses
+// rdpNavigateTab on a different tab, then rdpEvaluateTab.
+export async function rdpReadExtensionPage(
+  rdpClient: RdpClient,
+  pageUrl: string,
+  options: {timeoutMs?: number; textIncludes?: string} = {}
+): Promise<RdpRenderedPage> {
+  const timeoutMs = options.timeoutMs ?? 12000
+  rdpClient.drainEvents()
+  const listed = await rdpClient.request({to: 'root', type: 'listTabs'})
+  const tab = (listed?.tabs || [])[0]
+
+  if (!tab?.actor) {
+    throw new Error('Firefox RDP listed no tab to open the extension page in')
+  }
+
+  await navigateTab(rdpClient, tab.actor, pageUrl)
+
+  const expression =
+    'JSON.stringify({href:location.href,title:document.title,text:(document.body&&document.body.innerText||"").slice(0,2000)})'
+  const deadline = Date.now() + timeoutMs
+  let last = ''
+
+  while (Date.now() < deadline) {
+    const tabs = await rdpClient.request({to: 'root', type: 'listTabs'})
+    const live =
+      (tabs?.tabs || []).find((entry: RdpTab) =>
+        String(entry.url || '').startsWith('moz-extension://')
+      ) || (tabs?.tabs || [])[0]
+
+    if (live?.actor) {
+      const liveTarget = await rdpClient.request({
+        to: live.actor,
+        type: 'getTarget'
+      })
+      const consoleActor = liveTarget?.frame?.consoleActor
+
+      if (consoleActor) {
+        const raw = await rdpClient.evaluate(consoleActor, expression)
+        const parsed =
+          typeof raw === 'string'
+            ? (JSON.parse(raw) as RdpRenderedPage)
+            : (raw as RdpRenderedPage)
+
+        const href = String(parsed?.href || '')
+        const text = String(parsed?.text || '')
+        last = `${href} ${parsed?.title || ''} ${text}`
+        const bareHref = href.split('#')[0]
+        const hrefMatches = bareHref === pageUrl
+        const textMatches =
+          !options.textIncludes || text.includes(options.textIncludes)
+
+        if (hrefMatches && textMatches) {
+          return {
+            href,
+            title: String(parsed.title || ''),
+            text
+          }
+        }
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+
+  throw new Error(
+    `extension page ${pageUrl} did not load within ${timeoutMs}ms (last: ${last.slice(0, 180)})`
+  )
+}
+
+// Same windowGlobal navigateTo as rdpReadExtensionPage, on a tab the caller
+// picked. The first tab can keep holding the web page.
+export async function rdpNavigateTab(
+  rdpClient: RdpClient,
+  tabActor: string,
+  url: string
+): Promise<void> {
+  rdpClient.drainEvents()
+  await navigateTab(rdpClient, tabActor, url)
+}
+
+function valueFromEvaluation(raw: unknown): unknown {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return raw
+    }
+  }
+
+  return raw
+}
+
+// Same evaluateJSAsync read as rdpReadExtensionPage, against one tab
+// descriptor. getTarget follows that tab across the navigation.
+export async function rdpEvaluateTab(
+  rdpClient: RdpClient,
+  tabActor: string,
+  expression: string
+): Promise<unknown> {
+  rdpClient.drainEvents()
+  const target = await rdpClient.request({to: tabActor, type: 'getTarget'})
+  const consoleActor = target?.frame?.consoleActor
+
+  if (!consoleActor) {
+    throw new Error('Firefox tab target has no console actor')
+  }
+
+  return valueFromEvaluation(await rdpClient.evaluate(consoleActor, expression))
+}
+
 // Fixture factory
-// ---------------------------------------------------------------------------
 
 export const firefoxExtensionFixtures = (pathToExtension: string) => {
   return base.extend<{
@@ -295,8 +448,10 @@ export const firefoxExtensionFixtures = (pathToExtension: string) => {
         // Get addons actor
         const root = await rdpClient.request({to: 'root', type: 'getRoot'})
         const addonsActor: string | undefined = root?.addonsActor
+
         if (!addonsActor) {
           const tabs = await rdpClient.request({to: 'root', type: 'listTabs'})
+
           if (!tabs?.addonsActor) {
             throw new Error('Could not find addonsActor from Firefox RDP')
           }
@@ -315,6 +470,7 @@ export const firefoxExtensionFixtures = (pathToExtension: string) => {
         })
 
         const addonId: string | undefined = installResult?.addon?.id
+
         if (!addonId) {
           throw new Error(
             `installTemporaryAddon did not return an addon ID. Response: ${JSON.stringify(installResult)}`
@@ -333,6 +489,7 @@ export const firefoxExtensionFixtures = (pathToExtension: string) => {
         await use(context)
       } finally {
         if (rdpClient) rdpClient.disconnect()
+
         if (context) {
           try {
             await context.close()
@@ -340,6 +497,7 @@ export const firefoxExtensionFixtures = (pathToExtension: string) => {
             // ignore
           }
         }
+
         try {
           if (profileDir && fs.existsSync(profileDir)) {
             fs.rmSync(profileDir, {recursive: true, force: true})
@@ -362,11 +520,13 @@ export const firefoxExtensionFixtures = (pathToExtension: string) => {
 
       // Discover the moz-extension:// UUID from the profile
       const uuid = await getExtensionUuid(profileDir, addonId)
+
       if (!uuid) {
         throw new Error(
           `Could not discover moz-extension UUID for addon ${addonId} in ${profileDir}`
         )
       }
+
       await use(uuid)
     },
 

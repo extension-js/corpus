@@ -1,16 +1,3 @@
-// Template asset pipeline verification
-//
-// For each representative template, verifies that:
-//   1. Content scripts render in shadow DOM with expected elements + styles
-//   2. HTML pages (action popup, newtab, sidebar) render expected heading
-//   3. Icons and images are accessible via extension URLs
-//   4. CSS preprocessor output (sass, less, css-modules) produces styles
-//   5. Framework components (React, Vue, Svelte, Preact) mount and render
-//   6. Background service worker registers successfully
-//
-// Uses pre-built extensions (resolveBuiltExtensionPath handles building).
-// No mocking — real Chromium, real extension, real page rendering.
-
 import {expect} from '@playwright/test'
 import {
   extensionFixtures,
@@ -25,13 +12,12 @@ import fs from 'fs'
 
 const __dirname = getDirname(import.meta.url)
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function readManifest(exampleDir: string): any {
   const manifestPath = path.join(exampleDir, 'src', 'manifest.json')
   if (!fs.existsSync(manifestPath)) return null
+
   try {
     return JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
   } catch {
@@ -64,9 +50,7 @@ function normalize(p: string): string {
   return p.replace(/^\.\//, '')
 }
 
-// ---------------------------------------------------------------------------
 // Content templates: shadow DOM, styles, images
-// ---------------------------------------------------------------------------
 
 const CONTENT_TEMPLATES = [
   {
@@ -150,6 +134,7 @@ for (const tmpl of CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const host = await waitForShadowElement(
         page,
         tmpl.hostSelector,
@@ -164,15 +149,18 @@ for (const tmpl of CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       await expect
         .poll(
           async () => {
             return page.evaluate((sel) => {
               const host = document.querySelector(sel)
               if (!host?.shadowRoot) return null
+
               const el =
                 host.shadowRoot.querySelector('h1') ||
                 host.shadowRoot.querySelector('h2')
+
               return el?.textContent || null
             }, tmpl.hostSelector)
           },
@@ -191,6 +179,7 @@ for (const tmpl of CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       // CSS modules/preprocessor modules inject styles asynchronously —
       // poll until the container has position:fixed (proves selectors match).
       await expect
@@ -199,9 +188,12 @@ for (const tmpl of CONTENT_TEMPLATES) {
             return page.evaluate((sel) => {
               const host = document.querySelector(sel)
               if (!host?.shadowRoot) return null
+
               const div = host.shadowRoot.querySelector('div')
               if (!div) return null
+
               const cs = window.getComputedStyle(div)
+
               return cs.position === 'fixed' ? true : null
             }, tmpl.hostSelector)
           },
@@ -216,6 +208,7 @@ for (const tmpl of CONTENT_TEMPLATES) {
       const bg = await page.evaluate((sel) => {
         const host = document.querySelector(sel)
         const div = host!.shadowRoot!.querySelector('div')!
+
         return window.getComputedStyle(div).backgroundColor
       }, tmpl.hostSelector)
       test
@@ -225,9 +218,7 @@ for (const tmpl of CONTENT_TEMPLATES) {
   })
 }
 
-// ---------------------------------------------------------------------------
 // Tailwind content templates: stylesheet must be PostCSS-compiled
-// ---------------------------------------------------------------------------
 //
 // Regression guard for the `?url` / `new URL(..., import.meta.url)` class of
 // bugs where the raw stylesheet (with `@import "tailwindcss"`) ships instead
@@ -246,25 +237,50 @@ const TAILWIND_CONTENT_TEMPLATES = [
 
 // Extract the compiled CSS that a content script would fetch at runtime.
 // Handles both emission modes that the build may produce:
-//   - A standalone file under content_scripts/*.css (when CSS is large enough)
-//   - An inlined data URI embedded in a content_scripts/*.js bundle (when small)
+//   - A standalone file under content_scripts/*.css (older CLIs, large sheets)
+//   - A base64 data URI embedded in a content_scripts/*.js bundle (older CLIs)
+//   - A charset=utf-8 data URI built from encodeURIComponent('<css>'...) in
+//     the bundle, which is how the CLI inlines a content-script stylesheet
+//     since it rewrites url() to the extension root (4.1.13 and up); the
+//     literal is followed by the chain that swaps in the extension root
 // Returns null if no CSS could be located under the built extension dir.
 function readCompiledContentCss(builtExtDir: string): string | null {
   const csDir = path.join(builtExtDir, 'content_scripts')
   if (!fs.existsSync(csDir)) return null
+
   const entries = fs.readdirSync(csDir, {withFileTypes: true})
+
   for (const entry of entries) {
     if (entry.isFile() && entry.name.endsWith('.css')) {
       return fs.readFileSync(path.join(csDir, entry.name), 'utf8')
     }
   }
+
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue
+
     const js = fs.readFileSync(path.join(csDir, entry.name), 'utf8')
-    const m = js.match(/"data:text\/css;base64,([A-Za-z0-9+/=]+)"/)
-    if (m) return Buffer.from(m[1], 'base64').toString('utf8')
+    const base64 = js.match(/"data:text\/css;base64,([A-Za-z0-9+/=]+)"/)
+    if (base64) return Buffer.from(base64[1], 'base64').toString('utf8')
+
+    const literal = js.match(
+      /data:text\/css;charset=utf-8,"\s*\+\s*encodeURIComponent\((["'])((?:\\.|(?!\1)[^\\])*)\1/
+    )
+    if (literal) return decodeJsStringLiteral(literal[2])
+
+    const encoded = js.match(/data:text\/css;charset=utf-8,([^"'`]+)/)
+    if (encoded) return decodeURIComponent(encoded[1])
   }
+
   return null
+}
+
+// The body of a JS string literal, with its escapes resolved. JSON handles
+// every escape the minifier writes except \' and a bare double quote.
+function decodeJsStringLiteral(body: string): string {
+  const asJson = body.replace(/\\'/g, "'").replace(/"/g, '\\"')
+
+  return JSON.parse(`"${asJson}"`)
 }
 
 for (const name of TAILWIND_CONTENT_TEMPLATES) {
@@ -284,6 +300,7 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
           `${name}: no CSS asset located under content_scripts/ — check build pipeline`
         )
         .not.toBeNull()
+
       // Source is `@import "tailwindcss"` (~30 bytes). If PostCSS ran, the
       // compiled output is many KB and carries the tailwindcss header marker
       // plus actual utility class rules we reference in the components. If
@@ -295,12 +312,14 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
           `${name}: emitted CSS missing tailwindcss header — stylesheet shipped uncompiled`
         )
         .toBe(true)
+
       test
         .expect(
           /\.text-white(?:[^a-zA-Z0-9_-]|$)/.test(css!),
           `${name}: emitted CSS missing .text-white rule — tailwind utility classes were not compiled`
         )
         .toBe(true)
+
       test
         .expect(
           !/@import\s+["']tailwindcss["']/.test(css!),
@@ -314,6 +333,7 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const h2 = await waitForShadowElement(page, hostSelector, 'h2', 30000)
       test.expect(h2, `${name}: h2 not found in shadow DOM`).not.toBeNull()
       await expect
@@ -323,6 +343,7 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
               const host = document.querySelector(sel)
               const el = host?.shadowRoot?.querySelector('h2')
               if (!el) return null
+
               return window
                 .getComputedStyle(el as HTMLElement)
                 .getPropertyValue('color')
@@ -340,12 +361,15 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const host = await waitForShadowElement(page, hostSelector, 'div', 30000)
       test
         .expect(host, `${name}: content container not found in shadow DOM`)
         .not.toBeNull()
+
       const rect = await host!.evaluate((node) => {
         const r = (node as HTMLElement).getBoundingClientRect()
+
         return {x: r.x, y: r.y, w: r.width, h: r.height}
       })
       const vp = page.viewportSize() || {width: 1280, height: 720}
@@ -355,6 +379,7 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
           `${name}: container rendered off-screen: ${JSON.stringify(rect)}`
         )
         .toBe(true)
+
       test
         .expect(
           rect.x < vp.width && rect.y < vp.height,
@@ -365,9 +390,7 @@ for (const name of TAILWIND_CONTENT_TEMPLATES) {
   })
 }
 
-// ---------------------------------------------------------------------------
 // Pill-style content templates: javascript / typescript / framework starters
-// ---------------------------------------------------------------------------
 //
 // These templates render a button.content_pill inside a shadow-DOM wrapper.
 // The pill has `background: var(--sidebar-bg, #0a0c10)` — a plain CSS fallback
@@ -398,6 +421,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const pill = await waitForShadowElement(
         page,
         hostSelector,
@@ -407,6 +431,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
       test
         .expect(pill, `${name}: .content_pill not found in shadow DOM`)
         .not.toBeNull()
+
       await expect
         .poll(
           async () =>
@@ -414,6 +439,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
               const host = document.querySelector(sel)
               const el = host?.shadowRoot?.querySelector('.content_pill')
               if (!el) return null
+
               return window
                 .getComputedStyle(el as HTMLElement)
                 .getPropertyValue('background-color')
@@ -431,6 +457,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const textEl = await waitForShadowElement(
         page,
         hostSelector,
@@ -440,8 +467,10 @@ for (const name of PILL_CONTENT_TEMPLATES) {
       test
         .expect(textEl, `${name}: .content_pill_text not found`)
         .not.toBeNull()
+
       const info = await textEl!.evaluate((el) => {
         const r = (el as HTMLElement).getBoundingClientRect()
+
         return {
           text: el.textContent || '',
           x: r.x,
@@ -453,6 +482,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
       test
         .expect(info.text.trim(), `${name}: pill text mismatch`)
         .toBe('Open sidebar')
+
       const vp = page.viewportSize() || {width: 1280, height: 720}
       test
         .expect(
@@ -464,12 +494,11 @@ for (const name of PILL_CONTENT_TEMPLATES) {
   })
 }
 
-// ---------------------------------------------------------------------------
 // content-custom-font: fonts + plain CSS (via @import "tailwindcss" passthrough)
-// ---------------------------------------------------------------------------
 {
   const name = 'content-custom-font'
   const exampleDir = path.join(__dirname, name)
+
   if (fs.existsSync(path.join(exampleDir, 'src', 'manifest.json'))) {
     const pathToExtension = resolveBuiltExtensionPath(exampleDir)
     const test = extensionFixtures(pathToExtension)
@@ -492,6 +521,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
           waitUntil: 'domcontentloaded',
           timeout: 60000
         })
+
         const host = await waitForShadowElement(
           page,
           hostSelector,
@@ -506,6 +536,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
                 const h = document.querySelector(sel)
                 const el = h?.shadowRoot?.querySelector('.content_script')
                 if (!el) return null
+
                 return window
                   .getComputedStyle(el as HTMLElement)
                   .getPropertyValue('background-color')
@@ -523,6 +554,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
           waitUntil: 'domcontentloaded',
           timeout: 60000
         })
+
         const demo = await waitForShadowElement(
           page,
           hostSelector,
@@ -532,8 +564,10 @@ for (const name of PILL_CONTENT_TEMPLATES) {
         test
           .expect(demo, `${name}: .font_demo.font_momo_signature not found`)
           .not.toBeNull()
+
         const rect = await demo!.evaluate((el) => {
           const r = (el as HTMLElement).getBoundingClientRect()
+
           return {x: r.x, y: r.y, w: r.width, h: r.height}
         })
         const vp = page.viewportSize() || {width: 1280, height: 720}
@@ -548,12 +582,11 @@ for (const name of PILL_CONTENT_TEMPLATES) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // new-browser-flags: inline-styled indicator (no shadow DOM)
-// ---------------------------------------------------------------------------
 {
   const name = 'new-browser-flags'
   const exampleDir = path.join(__dirname, name)
+
   if (fs.existsSync(path.join(exampleDir, 'src', 'manifest.json'))) {
     const pathToExtension = resolveBuiltExtensionPath(exampleDir)
     const test = extensionFixtures(pathToExtension)
@@ -564,6 +597,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
           waitUntil: 'domcontentloaded',
           timeout: 60000
         })
+
         // Indicator is created inline and auto-removed after 5s. Poll with a
         // short window to catch it before teardown.
         await expect
@@ -577,7 +611,9 @@ for (const name of PILL_CONTENT_TEMPLATES) {
                     )
                 )
                 if (!el) return null
+
                 const r = el.getBoundingClientRect()
+
                 return {
                   visible: r.width > 0 && r.height > 0,
                   bg: window.getComputedStyle(el).backgroundColor
@@ -595,9 +631,7 @@ for (const name of PILL_CONTENT_TEMPLATES) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // HTML page templates: action popup, newtab, sidebar
-// ---------------------------------------------------------------------------
 
 interface HtmlTemplate {
   name: string
@@ -610,6 +644,7 @@ const HTML_TEMPLATES: HtmlTemplate[] = [
     name: 'action',
     getUrl: (eid, m) => {
       const p = getPopupPath(m)
+
       return p ? `chrome-extension://${eid}/${normalize(p)}` : null
     },
     expectedHeading: 'Action Extension'
@@ -645,6 +680,7 @@ for (const tmpl of HTML_TEMPLATES) {
         waitUntil: 'domcontentloaded',
         timeout: 60000
       })
+
       const heading = page.locator('h1, h2').first()
       await test.expect(heading).toBeVisible({timeout: 30000})
       const text = await heading.textContent()
@@ -680,7 +716,14 @@ for (const tmpl of HTML_TEMPLATES) {
     })
 
     test('icon image is accessible', async ({page, extensionId}) => {
-      const iconUrl = `chrome-extension://${extensionId}/icons/icon.png`
+      // Icons keep their in-project paths in the build output (extension
+      // >= 4.0.4), so the manifest declaration is the source of truth.
+      const iconPath = Object.values(manifest?.icons ?? {})[0] as
+        | string
+        | undefined
+      test.skip(!iconPath, `${tmpl.name}: manifest declares no icons`)
+
+      const iconUrl = `chrome-extension://${extensionId}/${normalize(iconPath!)}`
       const resp = await page.goto(iconUrl, {timeout: 10000})
       test
         .expect(resp?.status(), `${tmpl.name}: icon returned non-200`)
@@ -689,9 +732,7 @@ for (const tmpl of HTML_TEMPLATES) {
   })
 }
 
-// ---------------------------------------------------------------------------
 // Framework templates: mount + render
-// ---------------------------------------------------------------------------
 
 const FRAMEWORK_TEMPLATES = [
   {name: 'react', selector: '#root, [data-extension-root]'},
@@ -746,9 +787,7 @@ for (const tmpl of FRAMEWORK_TEMPLATES) {
   })
 }
 
-// ---------------------------------------------------------------------------
 // Background service worker registration
-// ---------------------------------------------------------------------------
 
 const BG_TEMPLATES = ['content', 'action', 'javascript', 'new', 'sidebar']
 
@@ -765,6 +804,7 @@ for (const templateName of BG_TEMPLATES) {
   test.describe(`${templateName}: background service worker`, () => {
     test('service worker is registered', async ({context}) => {
       const workers = context.serviceWorkers()
+
       if (workers.length === 0) {
         try {
           await context.waitForEvent('serviceworker', {timeout: 10000})
@@ -772,6 +812,7 @@ for (const templateName of BG_TEMPLATES) {
           // Extension might not have MV3 service worker
         }
       }
+
       // Either we found workers at start or after waiting
       const allWorkers = context.serviceWorkers()
       const extensionWorkers = allWorkers.filter((w) =>

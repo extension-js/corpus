@@ -1,0 +1,24 @@
+{
+  "title": "New Tab",
+  "tags": ["new-tab", "javascript"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Open a new tab and this page loads in place of the default",
+    "Edit src/newtab/index.html and save to watch the tab update"
+  ],
+  "useCases": [
+    "A new tab page as the primary UI surface",
+    "Dashboards, launchers, and start pages",
+    "Starting point for new tab extensions in JavaScript"
+  ],
+  "docsUrl": "https://extension.js.org/docs/implementation-guide/html",
+  "video": "fouoMkXLyvQ",
+  "store": {
+    "summary": "Replaces your new tab page with a simple page.",
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the new template. Not yet submitted to any store."
+    ]
+  }
+}

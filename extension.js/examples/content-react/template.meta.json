@@ -1,0 +1,28 @@
+{
+  "tags": ["content", "options", "storage", "react", "typescript", "tailwind"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Click Open options on the overlay injected into the page",
+    "Tick the setting and watch the overlay move to the left edge"
+  ],
+  "useCases": [
+    "A React UI injected into any page, isolated in a Shadow DOM",
+    "One setting shared between a React options page and a content script",
+    "Starting point for content-script extensions that need preferences"
+  ],
+  "docsUrl": "https://extension.js.org/docs/languages-and-frameworks/react",
+  "video": "oGNhj9k4bNs",
+  "store": {
+    "summary": "Shows a small overlay UI on web pages, with an options page that moves it from right to left.",
+    "justifications": {
+      "Content script match <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting.",
+      "storage": "keeps the one setting the options page writes, so the overlay stays on the chosen edge after closing the page and restarting the browser. Nothing leaves the browser."
+    },
+    "reviewerHints": "Start by opening any page, then click Open options on the overlay and tick the setting.",
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-react template. Not yet submitted to any store."
+    ]
+  }
+}

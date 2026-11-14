@@ -1,7 +1,124 @@
+// SidebarApp.js - handles interaction with the extension's side panel, sends
+// requests to the service worker (background.js), and updates the panel's UI
+// (index.html) on completion.
+
 import {ACTION_NAME} from '../constants.js'
 import './styles.css'
-import transformersLogo from '../images/icon.png'
 
+// Firefox Manifest V2 returns promises only from the browser namespace.
+const ext = globalThis.browser ?? chrome
+
+const inputElement = document.getElementById('text')
+const outputElement = document.getElementById('output')
+
+// Classify when the typing pauses, not on every keystroke. A sentiment model
+// asked about "Debu" answers with a confident guess, so a per-key run flips
+// the label on word fragments and rewrites the card dozens of times a sentence.
+const CLASSIFY_AFTER_MS = 400
+const MIN_TEXT_LENGTH = 12
+const PENDING_MARK = '…'
+
+let pendingTimer = null
+let latestRequest = 0
+
+async function classifyText(text) {
+  const request = ++latestRequest
+  outputElement.textContent = PENDING_MARK
+
+  // Bundle the input data into a message and send it to the service worker.
+  const response = await ext.runtime.sendMessage({action: ACTION_NAME, text})
+
+  // A slower answer for older text must not overwrite a newer one.
+  if (request !== latestRequest) return
+
+  // Handle results returned by the service worker (`background.js`) and
+  // update the panel's UI.
+  outputElement.textContent = JSON.stringify(response, null, 2)
+}
+
+// Listen for changes made to the textbox.
+inputElement.addEventListener('input', (event) => {
+  clearTimeout(pendingTimer)
+  latestRequest++
+
+  const text = event.target.value.trim()
+
+  if (!text) {
+    outputElement.textContent = ''
+
+    return
+  }
+
+  // Too short to mean anything yet: show that a result is coming rather
+  // than a confident label for a fragment.
+  outputElement.textContent = PENDING_MARK
+  if (text.length < MIN_TEXT_LENGTH) return
+
+  pendingTimer = setTimeout(() => classifyText(text), CLASSIFY_AFTER_MS)
+})
+
+// Enter classifies at once, whatever the length.
+inputElement.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return
+
+  clearTimeout(pendingTimer)
+  const text = inputElement.value.trim()
+  if (text) classifyText(text)
+})
+
+////////////////////// 1. Active tab //////////////////////
+//
+// The side panel sits next to a page, so it can classify that page's text or
+// selection. The content script reads it, the service worker relays it here
+// (a panel cannot message a tab directly), and the textbox shows what ran.
+// These arrive whole, so they skip the typing pause.
+function classify(text) {
+  clearTimeout(pendingTimer)
+  inputElement.value = text
+  classifyText(text)
+}
+
+async function classifyFromActiveTab(action, what) {
+  const response = await ext.runtime.sendMessage({action})
+  const text = response?.ok ? response.context?.text || '' : ''
+
+  if (!text) {
+    const error = response?.error || `No ${what} found on the active tab`
+    outputElement.textContent = JSON.stringify({error}, null, 2)
+
+    return
+  }
+
+  classify(text)
+}
+
+document.getElementById('use-page').addEventListener('click', () => {
+  classifyFromActiveTab('getActiveTabContext', 'page text')
+})
+
+document.getElementById('use-selection').addEventListener('click', () => {
+  classifyFromActiveTab('getActiveTabSelection', 'selection')
+})
+
+////////////////////// 2. Context menu //////////////////////
+//
+// A right-click classification runs in the service worker and is broadcast
+// back, so an open panel shows the same result as typed text would.
+ext.runtime.onMessage.addListener((message) => {
+  if (message?.action !== 'classification-broadcast') return
+
+  clearTimeout(pendingTimer)
+  latestRequest++
+  if (typeof message.text === 'string') inputElement.value = message.text
+
+  const output = message.ok ? message.result : {error: message.error}
+  outputElement.textContent = JSON.stringify(output, null, 2)
+})
+
+////////////////////// 3. Model settings //////////////////////
+//
+// The service worker caches one pipeline per configuration and reads the
+// active one from storage, so a change here takes effect on the next run.
 const DEFAULTS = {
   task: 'text-classification',
   model: 'Xenova/distilbert-base-uncased-finetuned-sst-2-english',
@@ -19,282 +136,55 @@ const MODELS = {
   'text-generation': ['Xenova/tiny-stories-1M']
 }
 
-function createSidebarHTML(logoSrc) {
-  return `
-    <div class="sidebar_app">
-      <img
-        class="sidebar_logo"
-        src="${logoSrc}"
-        alt="The Transformers.js logo"
-      />
-      <h1 class="sidebar_title" id="title">Transformers.js Sidebar Panel</h1>
-      <p class="sidebar_description">
-        AI-powered sentiment analysis running in your browser.
-        <br />
-        Learn more in the
-        <a
-          href="https://extension.js.org"
-          target="_blank" rel="noopener noreferrer"
-        >Extension.js docs</a>
-      </p>
+const taskEl = document.getElementById('task')
+const modelEl = document.getElementById('model')
+const customEl = document.getElementById('customModel')
+const deviceEl = document.getElementById('device')
+const dtypeEl = document.getElementById('dtype')
 
-      <div class="sidebar_config_section">
-        <h3 class="sidebar_output_title">Model Settings</h3>
+function populateModels(taskValue, selected) {
+  modelEl.replaceChildren(...MODELS[taskValue].map((m) => new Option(m, m)))
 
-        <div class="sidebar_input_section">
-          <label class="sidebar_label" for="task">Task</label>
-          <select id="task"></select>
-        </div>
-
-        <div class="sidebar_input_section">
-          <label class="sidebar_label" for="model">Model</label>
-          <select id="model"></select>
-        </div>
-
-        <div class="sidebar_input_section">
-          <label class="sidebar_label" for="customModel">Custom model (optional)</label>
-          <input id="customModel" placeholder="org/model-id" />
-        </div>
-
-        <div class="sidebar_input_section">
-          <label class="sidebar_label" for="device">Device</label>
-          <select id="device">
-            <option value="webgpu">webgpu</option>
-            <option value="webgl">webgl</option>
-            <option value="cpu">cpu</option>
-          </select>
-        </div>
-
-        <div class="sidebar_input_section">
-          <label class="sidebar_label" for="dtype">Precision</label>
-          <select id="dtype">
-            <option value="q4">q4</option>
-            <option value="q8">q8</option>
-            <option value="fp32">fp32</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="sidebar_input_section">
-        <label for="text-input" class="sidebar_label">
-          Enter text for sentiment analysis:
-        </label>
-        <textarea id="text-input" placeholder="Type or paste your text here..." rows="4"></textarea>
-        <div class="actions">
-          <button id="use-page" type="button" title="Pull text from the active page">Use page text</button>
-          <button id="use-selection" type="button" title="Pull the active selection from the page">Use selection</button>
-          <button id="run-analysis">Run Analysis</button>
-        </div>
-      </div>
-
-      <div class="sidebar_output_section">
-        <h3 class="sidebar_output_title">Analysis Results</h3>
-        <div id="output" class="sidebar_output">
-          Enter some text above to see the sentiment analysis results.
-        </div>
-      </div>
-    </div>
-  `
+  if (selected && MODELS[taskValue].includes(selected)) {
+    modelEl.value = selected
+  }
 }
 
-function SidebarApp() {
-  const root = document.getElementById('root')
-  if (!root) return
+async function loadConfig() {
+  taskEl.replaceChildren(...Object.keys(MODELS).map((t) => new Option(t, t)))
 
-  root.innerHTML = createSidebarHTML(transformersLogo)
+  const {modelConfig} = await ext.storage.sync.get('modelConfig')
+  const cfg = {...DEFAULTS, ...(modelConfig || {})}
 
-  // Cache elements after rendering
-  const inputElement = root.querySelector('#text-input')
-  const outputElement = root.querySelector('#output')
-  const titleElement = root.querySelector('#title')
-  const runBtn = root.querySelector('#run-analysis')
-  const usePageBtn = root.querySelector('#use-page')
-  const useSelectionBtn = root.querySelector('#use-selection')
-  const taskEl = root.querySelector('#task')
-  const modelEl = root.querySelector('#model')
-  const customEl = root.querySelector('#customModel')
-  const deviceEl = root.querySelector('#device')
-  const dtypeEl = root.querySelector('#dtype')
+  taskEl.value = cfg.task
+  populateModels(cfg.task, cfg.model)
+  customEl.value = cfg.customModel || ''
+  deviceEl.value = cfg.device
+  dtypeEl.value = cfg.dtype
+}
 
-  // Show active model in title (if available)
-  chrome.storage.sync.get('modelConfig').then(({modelConfig}) => {
-    if (modelConfig?.model && titleElement) {
-      titleElement.textContent = `Transformers.js (${modelConfig.model})`
-    }
-  })
+async function saveConfig() {
+  const customModel = customEl.value.trim()
 
-  // Populate task and model selects
-  function populateTasks() {
-    taskEl.innerHTML = Object.keys(MODELS)
-      .map((t) => `<option value="${t}">${t}</option>`)
-      .join('')
-  }
-
-  function populateModels(taskValue, selected) {
-    modelEl.innerHTML = MODELS[taskValue]
-      .map((m) => `<option value="${m}">${m}</option>`)
-      .join('')
-    if (selected && MODELS[taskValue].includes(selected))
-      modelEl.value = selected
-  }
-
-  async function loadConfig() {
-    populateTasks()
-    const {modelConfig} = await chrome.storage.sync.get('modelConfig')
-    const cfg = {...DEFAULTS, ...(modelConfig || {})}
-    taskEl.value = cfg.task
-    populateModels(cfg.task, cfg.model)
-    customEl.value = cfg.customModel || ''
-    deviceEl.value = cfg.device
-    dtypeEl.value = cfg.dtype
-  }
-
-  function currentConfig() {
-    const customModel = customEl.value.trim()
-    return {
+  await ext.storage.sync.set({
+    modelConfig: {
       task: taskEl.value,
       model: customModel || modelEl.value,
       customModel: customModel || undefined,
       device: deviceEl.value,
       dtype: dtypeEl.value
     }
-  }
-
-  async function saveConfig() {
-    const cfg = currentConfig()
-    await chrome.storage.sync.set({modelConfig: cfg})
-    if (titleElement && cfg.model) {
-      titleElement.textContent = `Transformers.js (${cfg.model})`
-    }
-    // Notify background (optional, background also listens to storage change)
-    chrome.runtime.sendMessage({action: 'model-config-updated', config: cfg})
-  }
-
-  // Changing the task re-populates the model list; every change persists config.
-  taskEl.addEventListener('change', async () => {
-    populateModels(taskEl.value)
-    await saveConfig()
-  })
-  ;[modelEl, customEl, deviceEl, dtypeEl].forEach((el) =>
-    el.addEventListener('change', saveConfig)
-  )
-
-  loadConfig()
-
-  // Run analysis only when clicking the button
-  runBtn.addEventListener('click', async () => {
-    const text = inputElement.value.trim()
-    if (!text) {
-      outputElement.textContent =
-        'Enter some text above to see the sentiment analysis results.'
-      outputElement.className = 'sidebar_output'
-      return
-    }
-    outputElement.textContent = 'Analyzing sentiment...'
-    outputElement.className = 'sidebar_output sidebar_output--loading'
-    try {
-      await classifyText(text, outputElement)
-    } catch (error) {
-      showError(error, outputElement)
-    }
-  })
-
-  // Pull text from the active page (relayed through the background SW
-  // because the sidebar can't message tabs directly in MV3).
-  async function fillFromActiveTab(action, fallback) {
-    try {
-      const response = await chrome.runtime.sendMessage({action})
-      if (!response?.ok) {
-        showError(
-          new Error(response?.error || `Could not read ${fallback}`),
-          outputElement
-        )
-        return
-      }
-      const text = response.context?.text || ''
-      if (!text) {
-        showError(
-          new Error(`No ${fallback} found on the active tab`),
-          outputElement
-        )
-        return
-      }
-      inputElement.value = text
-      outputElement.textContent = `Loaded ${fallback} from the active tab. Click "Run Analysis" to classify it.`
-      outputElement.className = 'sidebar_output'
-    } catch (error) {
-      showError(error, outputElement)
-    }
-  }
-
-  usePageBtn.addEventListener('click', () =>
-    fillFromActiveTab('getActiveTabContext', 'page text')
-  )
-  useSelectionBtn.addEventListener('click', () =>
-    fillFromActiveTab('getActiveTabSelection', 'selection')
-  )
-
-  // Pick up classifications triggered from the right-click context menu.
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message?.action !== 'classification-broadcast') return
-    if (message.ok) {
-      inputElement.value = message.text
-      showResults(message.result, outputElement)
-    } else {
-      showError(new Error(message.error), outputElement)
-    }
   })
 }
 
-async function classifyText(text, outputElement) {
-  try {
-    // Bundle the input data into a message
-    const message = {
-      action: ACTION_NAME,
-      text: text
-    }
+// Changing the task re-populates the model list. Every change persists.
+taskEl.addEventListener('change', async () => {
+  populateModels(taskEl.value)
+  await saveConfig()
+})
 
-    // Send message to the service worker
-    const response = await chrome.runtime.sendMessage(message)
-
-    if (response && response.length > 0) {
-      showResults(response, outputElement)
-    } else {
-      throw new Error('No results received from classification')
-    }
-  } catch (error) {
-    showError(error, outputElement)
-  }
+for (const el of [modelEl, customEl, deviceEl, dtypeEl]) {
+  el.addEventListener('change', saveConfig)
 }
 
-function showResults(results, outputElement) {
-  // Format the results for display
-  const formattedResults = results.map((result) => ({
-    label: result.label,
-    score: (result.score * 100).toFixed(2) + '%',
-    confidence:
-      result.score > 0.8 ? 'High' : result.score > 0.6 ? 'Medium' : 'Low'
-  }))
-
-  const output = {
-    results: formattedResults,
-    timestamp: new Date().toLocaleTimeString(),
-    model: 'DistilBERT (SST-2)'
-  }
-
-  outputElement.textContent = JSON.stringify(output, null, 2)
-  outputElement.className = 'sidebar_output sidebar_output--success'
-}
-
-function showError(error, outputElement) {
-  const errorOutput = {
-    error: error.message || 'Classification failed',
-    timestamp: new Date().toLocaleTimeString(),
-    suggestion: 'Try again with different text or check your connection'
-  }
-
-  outputElement.textContent = JSON.stringify(errorOutput, null, 2)
-  outputElement.className = 'sidebar_output sidebar_output--error'
-}
-
-SidebarApp()
+loadConfig()

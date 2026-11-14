@@ -12,6 +12,10 @@ console.log('[From the page context] Hello from content_scripts!')
 export default function initial() {
   const rootDiv = document.createElement('div')
   rootDiv.setAttribute('data-extension-root', 'true')
+  // Isolate the host from page styles (e.g. example.com ships div{opacity:.8},
+  // which would otherwise fade the whole widget): the shadow DOM only protects
+  // descendants; the host element itself still takes page CSS.
+  rootDiv.style.cssText = 'all: initial !important'
   document.body.appendChild(rootDiv)
 
   // Injecting content_scripts inside a shadow dom
@@ -33,14 +37,30 @@ export default function initial() {
   const app = createApp(ContentApp)
   app.mount(contentDiv)
 
+  // The sidebar asks this page for its title over runtime messaging, and the
+  // answer leaves with the UI on teardown so a reload never answers twice.
+  chrome.runtime.onMessage.addListener(answerPageTitle)
+
   return () => {
+    chrome.runtime.onMessage.removeListener(answerPageTitle)
     rootDiv.remove()
   }
+}
+
+function answerPageTitle(
+  message: {type?: string} | undefined,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (answer: {title: string; url: string}) => void
+) {
+  if (!message || message.type !== 'getPageTitle') return
+
+  sendResponse({title: document.title, url: location.href})
 }
 
 async function fetchCSS() {
   const cssUrl = new URL('./styles.css', import.meta.url)
   const response = await fetch(cssUrl)
   const text = await response.text()
+
   return response.ok ? text : Promise.reject(text)
 }

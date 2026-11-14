@@ -8,7 +8,12 @@ import {
 import path from 'path'
 import {execSync} from 'child_process'
 import fs from 'fs'
+import crypto from 'crypto'
 import {getDirname} from './dirname.js'
+
+// Keep in sync with scripts/build/prod-dist.mjs, which publishes the same trees
+// from globalSetup. Playwright loads specs as CJS, so it cannot import it.
+export const PROD_DIST_ROOT = '.prod-dist'
 
 // Wait for `pathToExtension` to be a complete, loadable extension before
 // launching Chromium. The dev-html specs in `template.dev.spec.ts` write to
@@ -34,6 +39,7 @@ async function waitForExtensionReady(
 
   // 1. Manifest must exist, be non-empty, and parse.
   let manifest: any = null
+
   while (Date.now() - start < timeoutMs) {
     try {
       if (fs.statSync(manifestPath).size > 0) {
@@ -43,8 +49,10 @@ async function waitForExtensionReady(
     } catch {
       // Missing/partial — keep polling.
     }
+
     await sleep(100)
   }
+
   if (!manifest) {
     // Don't escalate to a thrown error: the fixture's existing path-validation
     // gives a clearer message and matches the pre-fix behavior on truly-bad
@@ -59,6 +67,7 @@ async function waitForExtensionReady(
   const refs: string[] = []
   const sw = manifest.background?.service_worker
   if (typeof sw === 'string') refs.push(sw)
+
   if (Array.isArray(manifest.content_scripts)) {
     for (const cs of manifest.content_scripts) {
       if (Array.isArray(cs?.js)) refs.push(...cs.js)
@@ -84,6 +93,7 @@ async function waitForExtensionReady(
   // Chrome won't read a half-written tree.
   while (Date.now() - start < timeoutMs) {
     let mtimeMs = 0
+
     try {
       mtimeMs = fs.statSync(manifestPath).mtimeMs
     } catch {
@@ -91,9 +101,54 @@ async function waitForExtensionReady(
       await sleep(100)
       continue
     }
+
     if (Date.now() - mtimeMs >= quietMs) break
+
     await sleep(100)
   }
+}
+
+const CLOSE_TIMEOUT_MS = 10_000
+const LAUNCH_TIMEOUT_MS = 20_000
+
+function killBrowserByUserDataDir(userDataDir: string) {
+  if (process.platform === 'win32') return
+
+  try {
+    execSync(`pkill -9 -f ${JSON.stringify(userDataDir)}`, {stdio: 'ignore'})
+  } catch {
+    // No process matched, which is the healthy case.
+  }
+}
+
+async function closeContextBounded(
+  context: BrowserContext,
+  userDataDir: string
+) {
+  const closed = context.close().then(
+    () => true,
+    () => true
+  )
+  const timedOut = new Promise<false>((resolve) =>
+    setTimeout(() => resolve(false), CLOSE_TIMEOUT_MS)
+  )
+  const finished = await Promise.race([closed, timedOut])
+  if (!finished) killBrowserByUserDataDir(userDataDir)
+}
+
+// A browser-channel lane (Chrome Canary, Chrome Dev) points this at a build
+// Playwright does not ship, so the pinned Chromium is bypassed when it is set.
+const chromiumBinaryOverride = (
+  process.env.EXTENSION_CHROMIUM_BINARY || ''
+).trim()
+
+function chromiumLaunchTarget(isHeadless: boolean) {
+  if (chromiumBinaryOverride) return {executablePath: chromiumBinaryOverride}
+
+  // headless:true alone selects the chromium_headless_shell build, which
+  // silently ignores --load-extension. The full build's new headless does
+  // support extensions, so opt into it whenever we run headless.
+  return isHeadless ? {channel: 'chromium' as const} : {}
 }
 
 export const extensionFixtures = (
@@ -116,53 +171,78 @@ export const extensionFixtures = (
     context: async ({}, use) => {
       const os = await import('os')
       const tmpRoot = os.tmpdir()
-      const userDataDir = fs.mkdtempSync(path.join(tmpRoot, 'pw-ext-'))
+      let userDataDir = fs.mkdtempSync(path.join(tmpRoot, 'pw-ext-'))
       let context: BrowserContext | null = null
+
       try {
         // Wait for the extension tree to be complete before Chrome reads it.
         // Cheap on static builds (manifest hasn't been touched), critical on
         // the dev-html suite where a prior test's write may still be flushing.
         await waitForExtensionReady(pathToExtension)
-        context = await chromium.launchPersistentContext(userDataDir, {
-          headless: isHeadless,
-          args: [
-            `--disable-extensions-except=${pathToExtension}`,
-            `--load-extension=${pathToExtension}`,
-            '--no-first-run', // Disable Chrome's native first run experience.
-            // Ensure extensions are loaded before page navigation
-            '--disable-extensions-file-access-check', // Allow extension file access
-            '--disable-client-side-phishing-detection', // Disables client-side phishing detection
-            '--disable-component-extensions-with-background-pages', // Disable some built-in extensions that aren't affected by '--disable-extensions'
-            '--disable-default-apps', // Disable installation of default apps
-            '--disable-features=InterestFeedContentSuggestions', // Disables the Discover feed on NTP
-            '--disable-features=Translate', // Disables Chrome translation, both the manual option and the popup prompt when a page with differing language is detected.
-            '--hide-scrollbars', // Hide scrollbars from screenshots.
-            '--mute-audio', // Mute any audio
-            '--no-default-browser-check', // Disable the default browser check, do not prompt to set it as such
-            '--no-first-run', // Skip first run wizards
-            '--ash-no-nudges', // Avoids blue bubble "user education" nudges (eg., "... give your browser a new look", Memory Saver)
-            '--disable-search-engine-choice-screen', // Disable the 2023+ search engine choice screen
-            '--disable-features=MediaRoute', // Avoid the startup dialog for `Do you want the application "Chromium.app" to accept incoming network connections?`.  Also disables the Chrome Media Router which creates background networking activity to discover cast targets. A superset of disabling DialMediaRouteProvider.
-            '--use-mock-keychain', // Use mock keychain on Mac to prevent the blocking permissions dialog about "Chrome wants to use your confidential information stored in your keychain"
-            '--disable-background-networking', // Disable various background network services, including extension updating, safe browsing service, upgrade detector, translate, UMA
-            '--disable-breakpad', // Disable crashdump collection (reporting is already disabled in Chromium)
-            '--disable-component-update', // Don't update the browser 'components' listed at chrome://components/
-            '--disable-domain-reliability', // Disables Domain Reliability Monitoring, which tracks whether the browser has difficulty contacting Google-owned sites and uploads reports to Google.
-            '--disable-features=AutofillServerCommunicatio', // Disables autofill server communication. This feature isn't disabled via other 'parent' flags.
-            '--disable-features=CertificateTransparencyComponentUpdate',
-            '--disable-sync', // Disable syncing to a Google account
-            '--disable-features=OptimizationHints', // Used for turning on Breakpad crash reporting in a debug environment where crash reporting is typically compiled but disabled. Disable the Chrome Optimization Guide and networking with its service API
-            '--disable-features=DialMediaRouteProvider', // A weaker form of disabling the MediaRouter feature. See that flag's details.
-            '--no-pings', // Don't send hyperlink auditing pings
-            '--enable-features=SidePanelUpdates' // Ensure the side panel is visible. This is used for testing the side panel feature.
-          ].filter((arg) => !!arg)
-        })
+        const launchOnce = (dir: string) =>
+          chromium.launchPersistentContext(dir, {
+            timeout: LAUNCH_TIMEOUT_MS,
+            headless: isHeadless,
+            ...chromiumLaunchTarget(isHeadless),
+            args: [
+              `--disable-extensions-except=${pathToExtension}`,
+              `--load-extension=${pathToExtension}`,
+              '--no-first-run', // Disable Chrome's native first run experience.
+              // Ensure extensions are loaded before page navigation
+              '--disable-extensions-file-access-check', // Allow extension file access
+              '--disable-client-side-phishing-detection', // Disables client-side phishing detection
+              '--disable-component-extensions-with-background-pages', // Disable some built-in extensions that aren't affected by '--disable-extensions'
+              '--disable-default-apps', // Disable installation of default apps
+              '--disable-features=InterestFeedContentSuggestions', // Disables the Discover feed on NTP
+              '--disable-features=Translate', // Disables Chrome translation, both the manual option and the popup prompt when a page with differing language is detected.
+              '--hide-scrollbars', // Hide scrollbars from screenshots.
+              '--mute-audio', // Mute any audio
+              '--no-default-browser-check', // Disable the default browser check, do not prompt to set it as such
+              '--no-first-run', // Skip first run wizards
+              '--ash-no-nudges', // Avoids blue bubble "user education" nudges (eg., "... give your browser a new look", Memory Saver)
+              '--disable-search-engine-choice-screen', // Disable the 2023+ search engine choice screen
+              '--disable-features=MediaRoute', // Avoid the startup dialog for `Do you want the application "Chromium.app" to accept incoming network connections?`.  Also disables the Chrome Media Router which creates background networking activity to discover cast targets. A superset of disabling DialMediaRouteProvider.
+              '--use-mock-keychain', // Use mock keychain on Mac to prevent the blocking permissions dialog about "Chrome wants to use your confidential information stored in your keychain"
+              '--disable-background-networking', // Disable various background network services, including extension updating, safe browsing service, upgrade detector, translate, UMA
+              '--disable-breakpad', // Disable crashdump collection (reporting is already disabled in Chromium)
+              '--disable-component-update', // Don't update the browser 'components' listed at chrome://components/
+              '--disable-domain-reliability', // Disables Domain Reliability Monitoring, which tracks whether the browser has difficulty contacting Google-owned sites and uploads reports to Google.
+              '--disable-features=AutofillServerCommunicatio', // Disables autofill server communication. This feature isn't disabled via other 'parent' flags.
+              '--disable-features=CertificateTransparencyComponentUpdate',
+              '--disable-sync', // Disable syncing to a Google account
+              '--disable-features=OptimizationHints', // Used for turning on Breakpad crash reporting in a debug environment where crash reporting is typically compiled but disabled. Disable the Chrome Optimization Guide and networking with its service API
+              '--disable-features=DialMediaRouteProvider', // A weaker form of disabling the MediaRouter feature. See that flag's details.
+              '--no-pings', // Don't send hyperlink auditing pings
+              '--force-color-profile=srgb', // Deterministic colors in screenshots — without this, macOS (esp. headless) composites through the display profile and captured pixels shift uniformly (~+46/channel observed), breaking pixel assertions
+              '--enable-features=SidePanelUpdates' // Ensure the side panel is visible. This is used for testing the side panel feature.
+            ].filter((arg) => !!arg)
+          })
+
+        // A starved launch (leaked browser from an earlier template holding
+        // resources) recovers once its corpse is reaped and a fresh profile
+        // is used, so one bounded retry beats a 60s test-setup timeout.
+        try {
+          context = await launchOnce(userDataDir)
+        } catch {
+          killBrowserByUserDataDir(userDataDir)
+
+          try {
+            fs.rmSync(userDataDir, {recursive: true, force: true})
+          } catch {
+            // Ignore
+          }
+
+          userDataDir = fs.mkdtempSync(path.join(tmpRoot, 'pw-ext-'))
+          context = await launchOnce(userDataDir)
+        }
+
         // Store userDataDir for this context instance
         userDataDirMap.set(context, userDataDir)
 
         // Wait for extension to load by checking for service worker registration
         // Use event-based waiting instead of hardcoded delays
         let hasServiceWorker = false
+
         try {
           // Check if service worker already exists
           if (context.serviceWorkers().length === 0) {
@@ -174,6 +254,7 @@ export const extensionFixtures = (
                 // Extension may not have background script (e.g., action popups)
               })
           }
+
           hasServiceWorker = context.serviceWorkers().length > 0
         } catch {
           // Extension may not have background script, continue anyway
@@ -188,14 +269,13 @@ export const extensionFixtures = (
 
         await use(context)
       } finally {
-        // Ensure context is closed even if test fails or times out
+        // Ensure context is closed even if test fails or times out. A wedged
+        // browser must not eat the worker teardown budget, so the close is
+        // bounded and a survivor is reaped by its profile path.
         if (context) {
-          try {
-            await context.close()
-          } catch (error) {
-            // Ignore errors during close (context may already be closed)
-          }
+          await closeContextBounded(context, userDataDir)
         }
+
         // Clean up temp directory
         try {
           if (userDataDir && fs.existsSync(userDataDir)) {
@@ -231,22 +311,54 @@ export const extensionFixtures = (
       let extensionId: string | undefined
 
       // Helper function to read extension ID from Preferences
+      // Chromium derives an unpacked extension's id from its absolute path:
+      // sha256(path), first 16 bytes as hex, each hex digit mapped onto a-p.
+      // This is exact and needs no polling, which matters for extensions with
+      // no service worker: Chrome writes Preferences on shutdown, not during
+      // the run, so the Preferences fallback below has nothing to read yet.
+      const readExtensionIdFromPath = (): string | undefined => {
+        try {
+          // A manifest "key" overrides path derivation, so do not guess then.
+          const manifestPath = path.join(pathToExtension, 'manifest.json')
+
+          if (fs.existsSync(manifestPath)) {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+            if (manifest?.key) return undefined
+          }
+
+          const hash = crypto
+            .createHash('sha256')
+            .update(path.resolve(pathToExtension), 'utf8')
+            .digest('hex')
+            .slice(0, 32)
+
+          return [...hash]
+            .map((c) => String.fromCharCode(parseInt(c, 16) + 97))
+            .join('')
+        } catch {
+          return undefined
+        }
+      }
+
       const readExtensionIdFromPreferences = (
         userDataDir: string
       ): string | undefined => {
         try {
           const prefsPath = path.join(userDataDir, 'Default', 'Preferences')
+
           if (!fs.existsSync(prefsPath)) {
             return undefined
           }
 
           // Check file size - if it's very small, it might not have extension data yet
           const stats = fs.statSync(prefsPath)
+
           if (stats.size < 100) {
             return undefined
           }
 
           const prefsText = fs.readFileSync(prefsPath, 'utf-8')
+
           if (!prefsText || prefsText.trim().length === 0) {
             return undefined
           }
@@ -258,6 +370,7 @@ export const extensionFixtures = (
           const extensionEntries = Object.entries<any>(settings).filter(
             ([_, info]) => info?.path
           )
+
           if (extensionEntries.length === 0) {
             return undefined
           }
@@ -278,10 +391,12 @@ export const extensionFixtures = (
               try {
                 // Normalize both paths for comparison
                 const normalizedInfoPath = path.resolve(String(info.path))
+
                 // Check exact match first
                 if (normalizedInfoPath === normalizedTargetPath) {
                   return id
                 }
+
                 // Check if resolved paths point to the same location (handles symlinks)
                 if (
                   fs.realpathSync(normalizedInfoPath) ===
@@ -289,11 +404,13 @@ export const extensionFixtures = (
                 ) {
                   return id
                 }
+
                 // Fallback: check if basenames match (for cases where Chrome stores relative paths)
                 if (path.basename(normalizedInfoPath) === targetBasename) {
                   // Additional check: verify parent directory matches
                   const targetParent = path.dirname(normalizedTargetPath)
                   const infoParent = path.dirname(normalizedInfoPath)
+
                   if (
                     path.basename(targetParent) === path.basename(infoParent)
                   ) {
@@ -309,6 +426,7 @@ export const extensionFixtures = (
         } catch (error) {
           // Ignore errors during Preferences read (file might not exist yet, etc.)
         }
+
         return undefined
       }
 
@@ -319,6 +437,7 @@ export const extensionFixtures = (
       try {
         const testPage = context.pages()[0] || (await context.newPage())
         const cdpSession = await context.newCDPSession(testPage)
+
         try {
           const targets = await cdpSession.send('Target.getTargets')
           const extensionTargets = targets.targetInfos.filter(
@@ -330,6 +449,7 @@ export const extensionFixtures = (
           if (extensionTargets.length > 0) {
             const extensionUrl = extensionTargets[0].url
             const match = extensionUrl.match(/chrome-extension:\/\/([a-z]{32})/)
+
             if (match && match[1]) {
               extensionId = match[1]
             }
@@ -344,6 +464,7 @@ export const extensionFixtures = (
       // Fallback 1: Try service worker (for MV3 extensions with background scripts)
       if (!extensionId) {
         let [background] = context.serviceWorkers()
+
         if (!background) {
           try {
             background = await context.waitForEvent('serviceworker', {
@@ -353,6 +474,7 @@ export const extensionFixtures = (
             // No service worker - extension may not have background script
           }
         }
+
         if (background) {
           extensionId = background.url().split('/')[2]
         }
@@ -370,13 +492,23 @@ export const extensionFixtures = (
 
         for (let i = 0; i < maxRetries; i++) {
           extensionId = readExtensionIdFromPreferences(userDataDir)
+
           if (extensionId) {
             break
           }
+
           if (i < maxRetries - 1) {
             await new Promise((resolve) => setTimeout(resolve, retryDelay))
           }
         }
+      }
+
+      // Fallback 3: derive the id from the unpacked path. Extensions with no
+      // background service worker (an options page or a devtools panel that
+      // owns its own state) reach here, because fallbacks 1 and 2 both depend
+      // on state Chrome has not produced yet.
+      if (!extensionId) {
+        extensionId = readExtensionIdFromPath()
       }
 
       if (!extensionId) {
@@ -384,11 +516,13 @@ export const extensionFixtures = (
         const errorDetails = userDataDir
           ? `Preferences file exists: ${fs.existsSync(path.join(userDataDir, 'Default', 'Preferences'))}`
           : 'UserDataDir not found'
+
         throw new Error(
           `Could not determine extension ID for ${pathToExtension}. ${errorDetails}. ` +
             `Service workers: ${context.serviceWorkers().length}`
         )
       }
+
       await use(extensionId)
     }
   })
@@ -400,7 +534,6 @@ export async function takeScreenshot(page: any, screenshotPath: string) {
 }
 
 /**
- * Utility to access elements inside the Shadow DOM.
  * @param page The Playwright Page object.
  * @param shadowHostSelector The selector for the Shadow DOM host element.
  * @param innerSelector The selector for the element inside the Shadow DOM.
@@ -423,6 +556,7 @@ export async function getShadowRootElement(
   })
 
   const startTime = Date.now()
+
   while (Date.now() - startTime < effectiveTimeout) {
     const shadowHosts = page.locator(shadowHostSelector)
     const hostCount = await shadowHosts.count()
@@ -439,10 +573,12 @@ export async function getShadowRootElement(
       )
       const elementHandle =
         element.asElement() as ElementHandle<HTMLElement> | null
+
       if (elementHandle) {
         return elementHandle
       }
     }
+
     await page.waitForTimeout(250)
   }
 
@@ -460,6 +596,7 @@ export async function waitForShadowElement(
   const effectiveTimeout = timeoutMs === 30000 && isCI ? 60000 : timeoutMs
 
   const start = Date.now()
+
   while (Date.now() - start < effectiveTimeout) {
     try {
       const el = await getShadowRootElement(
@@ -472,8 +609,10 @@ export async function waitForShadowElement(
     } catch {
       /* noop */
     }
+
     await page.waitForTimeout(250)
   }
+
   return null
 }
 
@@ -481,8 +620,10 @@ export function getPathToExtension(exampleDir: string): string {
   const __dirname = getDirname(import.meta.url)
   const absoluteExampleDir = path.join(__dirname, exampleDir)
   const chromeDist = path.join(absoluteExampleDir, 'dist', 'chrome')
+
   try {
     const fs = require('fs') as typeof import('fs')
+
     if (!fs.existsSync(chromeDist)) {
       execSync(`pnpm extension build ${exampleDir}`, {
         cwd: __dirname,
@@ -492,6 +633,7 @@ export function getPathToExtension(exampleDir: string): string {
   } catch {
     /* noop */
   }
+
   return chromeDist
 }
 
@@ -502,12 +644,14 @@ export async function getExtensionId(pathToExtension: string): Promise<string> {
   const isHeadless = process.env.HEADLESS === 'true'
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: isHeadless,
+    ...chromiumLaunchTarget(isHeadless),
     args: [
       `--disable-extensions-except=${pathToExtension}`,
       `--load-extension=${pathToExtension}`,
       '--no-first-run'
     ]
   })
+
   try {
     // Try Preferences lookup
     try {
@@ -515,6 +659,7 @@ export async function getExtensionId(pathToExtension: string): Promise<string> {
       const prefsText = fs.readFileSync(prefsPath, 'utf-8')
       const prefs = JSON.parse(prefsText)
       const settings = prefs?.extensions?.settings || {}
+
       for (const [id, info] of Object.entries<any>(settings)) {
         if (
           info?.path &&
@@ -526,9 +671,11 @@ export async function getExtensionId(pathToExtension: string): Promise<string> {
     } catch {
       /* noop */
     }
+
     // Fallback to waiting for background service worker
     let [background] = context.serviceWorkers()
     if (!background) background = await context.waitForEvent('serviceworker')
+
     return background.url().split('/')[2]
   } finally {
     await context.close()
@@ -539,25 +686,209 @@ export function getSidebarPath(extensionId: string): string {
   return `chrome-extension://${extensionId}/sidebar/index.html`
 }
 
+// Navigate to a page inside the loaded extension. On failure, name the
+// artifact instead of surfacing Chrome's bare net error: report whether the
+// dist ships the file the URL points at, and list the dist contents.
+export async function gotoExtensionPage(
+  page: Page,
+  pathToExtension: string,
+  extensionId: string,
+  relPath: string
+): Promise<void> {
+  const url = `chrome-extension://${extensionId}/${relPath.replace(/^\//, '')}`
+
+  try {
+    await page.goto(url)
+  } catch (error) {
+    const diskPath = path.join(pathToExtension, relPath)
+    const shipped = fs.existsSync(diskPath)
+    let listing = '(unreadable)'
+
+    try {
+      listing = fs
+        .readdirSync(pathToExtension, {recursive: true})
+        .map(String)
+        .filter((entry) => !entry.includes('node_modules'))
+        .sort()
+        .join(', ')
+    } catch {
+      /* keep placeholder */
+    }
+
+    const reason = shipped
+      ? `the dist DOES ship ${relPath}, so the loaded extension and the ` +
+        `on-disk dist disagree (dist rewritten after load, or wrong id)`
+      : `the dist does NOT ship ${relPath}`
+
+    throw new Error(
+      `Navigation to ${url} failed: ${(error as Error).message.split('\n')[0]}. ` +
+        `Checked ${diskPath}: ${reason}. Dist contents: ${listing}`,
+      {cause: error}
+    )
+  }
+}
+
+// Collect the dist-relative files this manifest makes Chrome (or a spec)
+// read: entry pages, background, content scripts. Unpacked extensions are
+// served from disk at request time, so a dist missing any of these either
+// refuses to load or 404s the spec's page.goto with a bare net error.
+function manifestEntryRefs(manifest: any): string[] {
+  const refs: string[] = []
+
+  const push = (value: unknown) => {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      refs.push(value.replace(/^\.?\//, ''))
+    }
+  }
+
+  push(manifest?.background?.service_worker)
+  for (const script of manifest?.background?.scripts ?? []) push(script)
+
+  if (Array.isArray(manifest?.content_scripts)) {
+    for (const cs of manifest.content_scripts) {
+      for (const file of cs?.js ?? []) push(file)
+      for (const file of cs?.css ?? []) push(file)
+    }
+  }
+
+  push(manifest?.action?.default_popup)
+  push(manifest?.browser_action?.default_popup)
+  push(manifest?.side_panel?.default_path)
+  push(manifest?.sidebar_action?.default_panel)
+  push(manifest?.chrome_url_overrides?.newtab)
+  push(manifest?.options_ui?.page)
+  push(manifest?.devtools_page)
+
+  return refs
+}
+
+// Returns the manifest-referenced files missing from `dir`, or null when the
+// dir has no parseable manifest at all.
+export function missingManifestRefs(dir: string): string[] | null {
+  let manifest: any
+
+  try {
+    manifest = JSON.parse(
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+    )
+  } catch {
+    return null
+  }
+
+  return manifestEntryRefs(manifest).filter((rel) => {
+    try {
+      return fs.statSync(path.join(dir, rel)).size === 0
+    } catch {
+      return true
+    }
+  })
+}
+
+// A dist qualifies only when the manifest parses AND every file it
+// references exists non-empty. Manifest presence alone is not enough: an
+// interrupted or failed build can leave manifest.json without its pages
+// (seen as sidebar-shadcn failing 13/13 with net::ERR_FILE_NOT_FOUND on a
+// warm tree), and gating on the manifest alone would trust that poisoned
+// dist forever.
+export function isCompleteDist(dir: string): boolean {
+  const missing = missingManifestRefs(dir)
+
+  return missing !== null && missing.length === 0
+}
+
+// Read-only production trees, one per example, parked outside every example
+// so no project that wipes dist/ can reach the build another project reads.
+export function prodDistPath(exampleDirAbsolute: string): string {
+  const examplesDir = getDirname(import.meta.url)
+  const repoRoot = path.resolve(examplesDir, '..')
+  const slug = path
+    .relative(repoRoot, exampleDirAbsolute)
+    .replace(/[\\/]/g, '__')
+
+  return path.join(repoRoot, PROD_DIST_ROOT, slug, 'chrome')
+}
+
+// Copy `dist/chrome` into this example's private tree. The swap goes through
+// two renames so a reader never sees the target half-written.
+export function publishProdDist(exampleDirAbsolute: string): string | null {
+  const source = path.join(exampleDirAbsolute, 'dist', 'chrome')
+  if (!isCompleteDist(source)) return null
+
+  const target = prodDistPath(exampleDirAbsolute)
+  const staging = `${target}.staging-${process.pid}`
+  const retired = `${target}.retired-${process.pid}`
+
+  try {
+    fs.mkdirSync(path.dirname(target), {recursive: true})
+    fs.rmSync(staging, {recursive: true, force: true})
+    fs.cpSync(source, staging, {recursive: true})
+
+    try {
+      fs.renameSync(target, retired)
+    } catch {
+      // Nothing published yet.
+    }
+
+    fs.renameSync(staging, target)
+
+    return isCompleteDist(target) ? target : null
+  } catch {
+    return null
+  } finally {
+    fs.rmSync(staging, {recursive: true, force: true})
+    fs.rmSync(retired, {recursive: true, force: true})
+  }
+}
+
+// The published copy is older than a rebuilt `dist/chrome` when the prebuild
+// that would refresh it was skipped, and serving it tests the previous build.
+function publishedIsStale(
+  exampleDirAbsolute: string,
+  published: string
+): boolean {
+  const source = path.join(exampleDirAbsolute, 'dist', 'chrome')
+  if (!isCompleteDist(source)) return false
+
+  try {
+    return (
+      fs.statSync(path.join(source, 'manifest.json')).mtimeMs >
+      fs.statSync(path.join(published, 'manifest.json')).mtimeMs
+    )
+  } catch {
+    return false
+  }
+}
+
 export function resolveBuiltExtensionPath(exampleDirAbsolute: string): string {
+  // The private tree wins while it is current. scripts/build/prebuild-assets-
+  // templates.mjs publishes it serially at globalSetup, before any worker can
+  // race it, and SKIP_PREBUILD=1 leaves that to the first reader here.
+  const published = prodDistPath(exampleDirAbsolute)
+  const publishedComplete = isCompleteDist(published)
+
+  if (publishedComplete && !publishedIsStale(exampleDirAbsolute, published)) {
+    return published
+  }
+
+  const republished = publishProdDist(exampleDirAbsolute)
+  if (republished) return republished
+
+  if (publishedComplete) return published
+
   const roots = ['dist', 'build', '.extension']
   const channels = ['chrome', 'chromium', 'chrome-mv3']
   const candidateDirs: string[] = []
+
   for (const root of roots) {
     for (const ch of channels) {
       candidateDirs.push(path.join(exampleDirAbsolute, root, ch))
     }
   }
-  const hasManifest = (dir: string) => {
-    try {
-      return fs.existsSync(path.join(dir, 'manifest.json'))
-    } catch {
-      return false
-    }
-  }
-  for (const dir of candidateDirs) if (hasManifest(dir)) return dir
-  // Try building if not present. Some Extension.js versions install deps first
-  // and require a second invocation to actually build.
+
+  // Try building when no complete dist exists. This also self-heals a
+  // partial dist left behind by an interrupted earlier run. Some
+  // Extension.js versions install deps first and require a second
+  // invocation to actually build.
   const runBuild = () => {
     execSync(
       `node ../../scripts/build-with-manifest.mjs build --browser=chrome`,
@@ -567,33 +898,60 @@ export function resolveBuiltExtensionPath(exampleDirAbsolute: string): string {
       }
     )
   }
+
   try {
     runBuild()
   } catch {
     /* noop */
   }
-  if (!candidateDirs.some((dir) => hasManifest(dir))) {
-    try {
-      runBuild()
-    } catch {
-      /* noop */
-    }
+
+  const afterFirstBuild = publishProdDist(exampleDirAbsolute)
+  if (afterFirstBuild) return afterFirstBuild
+
+  try {
+    runBuild()
+  } catch {
+    /* noop */
   }
-  for (const dir of candidateDirs) if (hasManifest(dir)) return dir
-  // As a last attempt, search shallowly under known roots for any manifest.json
+
+  const afterSecondBuild = publishProdDist(exampleDirAbsolute)
+  if (afterSecondBuild) return afterSecondBuild
+
+  for (const dir of candidateDirs) if (isCompleteDist(dir)) return dir
+
+  // As a last attempt, search shallowly under known roots for any complete dist
   for (const root of roots) {
     const rootPath = path.join(exampleDirAbsolute, root)
+
     try {
       const entries = fs.readdirSync(rootPath, {withFileTypes: true})
+
       for (const entry of entries) {
         if (!entry.isDirectory()) continue
+
         const dir = path.join(rootPath, entry.name)
-        if (hasManifest(dir)) return dir
+        if (isCompleteDist(dir)) return dir
       }
     } catch {
       /* noop */
     }
   }
+
+  // A manifest-bearing but incomplete dist that the rebuild could not repair
+  // must fail loudly, naming the missing artifacts instead of letting Chrome
+  // surface a bare net::ERR_FILE_NOT_FOUND later.
+  for (const dir of candidateDirs) {
+    const missing = missingManifestRefs(dir)
+
+    if (missing !== null && missing.length > 0) {
+      throw new Error(
+        `Built extension at ${dir} is missing manifest-referenced files ` +
+          `after rebuild: ${missing.join(', ')}. The dist is stale or ` +
+          `partial. Delete it and rebuild.`
+      )
+    }
+  }
+
   // Last resort: return default expected path (will fail loudly in Playwright if missing)
   return path.join(exampleDirAbsolute, 'dist', 'chrome')
 }

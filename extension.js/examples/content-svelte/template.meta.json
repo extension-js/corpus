@@ -1,0 +1,28 @@
+{
+  "tags": ["content", "svelte", "typescript", "tailwind", "options", "storage"],
+  "difficulty": "beginner",
+  "timeToFirstSuccessMinutes": 2,
+  "firstSteps": [
+    "Run npm run dev to launch the extension",
+    "Click Open options on the overlay injected into the page",
+    "Tick the setting and watch the overlay move to the left edge"
+  ],
+  "useCases": [
+    "A Svelte overlay injected into every page, isolated in a Shadow DOM",
+    "One setting shared between a Svelte options page and a content script",
+    "Starting point for Svelte extensions that need preferences"
+  ],
+  "docsUrl": "https://extension.js.org/docs/languages-and-frameworks/svelte",
+  "video": "g6-GZ6_Rn38",
+  "store": {
+    "summary": "Shows a Svelte overlay on web pages, with an options page that moves it from right to left.",
+    "justifications": {
+      "Content script match <all_urls>": "The content script runs on the pages the user visits to render the extension's on-page interface. Narrow this to the specific sites your extension needs before submitting.",
+      "storage": "keeps the one setting the options page writes, so the choice survives closing the page and restarting the browser. The content script reads the same key to decide which edge the overlay sits on. Nothing leaves the browser."
+    },
+    "reviewerHints": "Start by opening any page, then click Open options on the overlay and tick the setting to watch the overlay move to the left edge.",
+    "versionHistory": [
+      "1.0.0 (unreleased): initial version from the content-svelte template. Not yet submitted to any store."
+    ]
+  }
+}

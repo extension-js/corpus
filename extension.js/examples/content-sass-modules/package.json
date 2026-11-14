@@ -1,15 +1,10 @@
 {
   "private": true,
-  "name": "content-sass-modules",
-  "description": "A browser extension content script example built with Extension.js using Sass CSS Modules. Demonstrates scoped styles for content scripts with Sass preprocessing.",
+  "name": "@extension-js/content-sass-modules",
+  "description": "Injects a small styled badge into every web page you visit, with a Sass modules options page that moves it to the left or right edge.",
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "author": {
-    "name": "Cezar Augusto",
-    "email": "boss@cezaraugusto.net",
-    "url": "https://cezaraugusto.com"
-  },
   "devDependencies": {
     "sass": "^1.77.8"
   },

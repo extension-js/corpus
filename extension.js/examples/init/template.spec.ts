@@ -12,13 +12,20 @@ const test = extensionFixtures(pathToExtension)
 
 test('build outputs a manifest with javascript icons', async () => {
   const manifestPath = path.join(pathToExtension, 'manifest.json')
+
   if (!fs.existsSync(manifestPath)) {
     throw new Error(
       `Manifest not found at ${manifestPath}. Extension may not be built.`
     )
   }
+
   const json = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
   test
-    .expect(['icon.png', 'images/icon.png', 'icons/icon.png'])
+    .expect([
+      'icon.png',
+      'images/icon.png',
+      'images/icon-16.png',
+      'icons/icon.png'
+    ])
     .toContain(json?.icons?.['16'])
 })

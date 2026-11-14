@@ -1,0 +1,23 @@
+{
+  "name": "Download manager button",
+  "version": "0.3",
+  "manifest_version": 3,
+  "description": "Replaces Chrome's download UI with a popup for searching, pausing, resuming, and opening downloads, with progress on the icon.",
+  "icons": {
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "19": "icon19.png",
+      "38": "icon38.png"
+    },
+    "default_title": "__MSG_extName__",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "default_locale": "en",
+  "optional_permissions": ["management"],
+  "permissions": ["downloads", "downloads.open", "downloads.ui", "storage"]
+}
