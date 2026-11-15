@@ -29,6 +29,18 @@ Each folder is a copy of its source at one pinned commit. `VENDORED.json` in the
 
 Of the 520 samples, 236 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 236 cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 232 buildable samples, and a failure in any of them is an Extension.js defect.
 
+## Browsers
+
+<div align="center">
+
+| <img alt="Chrome" src="https://media.extension.land/logos/browsers/chrome.svg" width="70"> | <img alt="Edge" src="https://media.extension.land/logos/browsers/edge.svg" width="70"> | <img alt="Firefox" src="https://media.extension.land/logos/browsers/firefox.svg" width="70"> | <img alt="Safari" src="https://media.extension.land/logos/browsers/safari.svg" width="70"> |
+| :-: | :-: | :-: | :-: |
+| <sup>Google Chrome<br>✅ Every release</sup> | <sup>Microsoft Edge<br>✅ Every release</sup> | <sup>Mozilla Firefox<br>✅ Every release</sup> | <sup>Apple Safari<br>✅ Weekly, on macOS</sup> |
+
+</div>
+
+Every sample is built once per browser. Safari builds go through Xcode, so they run on macOS only.
+
 ## What a run checks
 
 1. The vendored folders match their recorded hashes.
@@ -38,11 +50,11 @@ Of the 520 samples, 236 are in the build matrix. The rest are kept as data: arch
 
 ## When it runs
 
-| Workflow | Trigger | Scope | Effect |
-| :------- | :------ | :---- | :----- |
-| [Corpus gate](.github/workflows/corpus-gate.yml) | Called by the Extension.js release workflow, or by hand for any published version | All 232 samples on Chrome, Firefox and Edge | A stable release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
-| [Weekly QA](.github/workflows/weekly-qa.yml) | Mondays 06:00 UTC | All samples at the latest upstream commits, against `extension@latest`. A macOS lane adds Safari and does not gate | Opens an issue for a regression that survives a second build |
-| [Smoke](.github/workflows/smoke.yml) | Every push and pull request | 12 samples on Chrome and Firefox | Guards the harness itself |
+| Workflow | Scope | Effect |
+| :------- | :---- | :----- |
+| [Corpus gate](.github/workflows/corpus-gate.yml) | All 232 samples on Chrome, Firefox and Edge, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
+| [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`. A macOS lane adds Safari and does not gate | Opens an issue for a regression that survives a second build |
+| [Smoke](.github/workflows/smoke.yml) | 12 samples on Chrome and Firefox, on every push and pull request | Guards the harness itself |
 
 Run the gate by hand for any version on npm:
 
