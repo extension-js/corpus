@@ -85,6 +85,26 @@
       "vendorDir": "wpt"
     },
     {
+      "id": "webextension-demos",
+      "name": "dotproto webextension-demos",
+      "repo": "https://github.com/dotproto/webextension-demos",
+      "ref": "main",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "scan": [
+        "demos",
+        "testing"
+      ],
+      "ignore": [
+        "node_modules",
+        "build",
+        "dist"
+      ],
+      "enabled": true,
+      "license": "MIT",
+      "vendorDir": "webextension-demos"
+    },
+    {
       "id": "chromium",
       "name": "Chromium test extensions",
       "repo": "https://chromium.googlesource.com/chromium/src",

@@ -165,10 +165,11 @@ function vendorOne(src, lock) {
     copyTree(from, to, ignore)
   }
   // Carry upstream license/readme when the scan trees don't already include them.
-  for (const f of ['LICENSE', 'LICENSE.md', 'README.md']) {
-    const from = path.join(cache, f)
-    const to = path.join(dest, f)
-    if (fs.existsSync(from) && !fs.existsSync(to)) fs.copyFileSync(from, to)
+  // Matched by prefix: some upstreams split the text (LICENSE-MIT, LICENSE-CC-BY-4.0).
+  for (const e of fs.readdirSync(cache, {withFileTypes: true})) {
+    if (!e.isFile() || !(/^(licen[sc]e|copying|notice)/i.test(e.name) || e.name === 'README.md')) continue
+    const to = path.join(dest, e.name)
+    if (!fs.existsSync(to)) fs.copyFileSync(path.join(cache, e.name), to)
   }
 
   const t = treeHash(dest)

@@ -1,0 +1,20 @@
+{
+  "name": "Private Browsing Web Storage Test",
+  "version": "0.1.4",
+  "manifest_version": 3,
+  "background": {
+    "scripts": ["shared.js", "background.js"],
+    "service_worker": "sw.js"
+  },
+  "permissions": [
+    "storage",
+    "menus",
+    "contextMenus"
+  ],
+  "action": {},
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "private-browsing-web-storage@dotproto"
+    }
+  }
+}

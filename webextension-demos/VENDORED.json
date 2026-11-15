@@ -1,0 +1,21 @@
+{
+  "source": "webextension-demos",
+  "name": "dotproto webextension-demos",
+  "repo": "https://github.com/dotproto/webextension-demos",
+  "ref": "main",
+  "sha": "52bbea7d92eb7db4f6c272de0bc6867803c04cdd",
+  "vendoredAt": "2026-11-15T17:45:01.444Z",
+  "scan": [
+    "demos",
+    "testing"
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules",
+    "build",
+    "dist"
+  ],
+  "treeHash": "dcba83848a64b643",
+  "files": 17,
+  "bytes": 37346
+}

@@ -22,5 +22,11 @@
     "ref": "master",
     "repo": "https://github.com/web-platform-tests/wpt",
     "fetchedAt": "2026-11-15T17:44:59.865Z"
+  },
+  "webextension-demos": {
+    "sha": "52bbea7d92eb7db4f6c272de0bc6867803c04cdd",
+    "ref": "main",
+    "repo": "https://github.com/dotproto/webextension-demos",
+    "fetchedAt": "2026-11-15T17:45:00.383Z"
   }
 }
