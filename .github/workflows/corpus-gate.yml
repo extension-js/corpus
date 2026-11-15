@@ -17,6 +17,10 @@ on:
         description: 'Commit, tag or branch of this repository to run'
         type: string
         default: main
+      safari:
+        description: 'Also build every sample for Safari on a macOS runner'
+        type: boolean
+        default: false
     outputs:
       verdict:
         description: 'clean, not-clean or rebaseline'
@@ -36,6 +40,10 @@ on:
       ref:
         description: 'Commit, tag or branch of this repository to run'
         default: main
+      safari:
+        description: 'Also build every sample for Safari on a macOS runner'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -63,8 +71,10 @@ jobs:
         with: {node-version: 22}
       # Refuses a version npm does not have, so a typo cannot fall back to latest.
       - run: node scripts/assert-runtime-supported.mjs
-      - run: node scripts/sync.mjs
-      - run: node scripts/discover.mjs
+      # A release is gated on the samples vendored at this commit, never on
+      # what upstream pushed since. Weekly QA is the lane that reads upstream.
+      - run: node scripts/vendor.mjs --check
+      - run: node scripts/discover.mjs --vendored
       - run: node scripts/run-matrix.mjs --tier all --install --browsers chrome,firefox,edge
       - name: Report
         run: node scripts/report.mjs --markdown
@@ -80,4 +90,41 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: corpus-gate-${{ inputs.cli-version }}
+          path: reports/
+
+  # Safari builds through Xcode, so this lane needs macOS. It converts and
+  # builds every sample for Safari and opens no browser. A failing build fails
+  # the call, whatever baseline.safari.json holds.
+  safari:
+    if: ${{ inputs.safari == true }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      EXTENSION_TAG: ${{ inputs.cli-version }}
+      QA_CONCURRENCY: '4'
+      QA_STRICT: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: extension-js/corpus
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with: {node-version: 22}
+      - run: node scripts/assert-runtime-supported.mjs
+      - run: node scripts/vendor.mjs --check
+      - run: node scripts/discover.mjs --vendored
+      - run: node scripts/run-matrix.mjs --tier all --install --browsers safari
+      - name: Report
+        run: node scripts/report.mjs --markdown --baseline baseline.safari.json
+        continue-on-error: true
+      - name: Confirm regressions
+        run: node scripts/confirm-regressions.mjs
+        continue-on-error: true
+      - name: Status
+        run: node scripts/status.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-gate-safari-${{ inputs.cli-version }}
           path: reports/
