@@ -98,7 +98,9 @@ jobs:
   safari:
     if: ${{ inputs.safari == true }}
     runs-on: macos-latest
-    timeout-minutes: 90
+    # The first full run took 73 minutes, so the limit leaves room for a
+    # slow runner without letting a hung build hold a release for hours.
+    timeout-minutes: 150
     env:
       EXTENSION_TAG: ${{ inputs.cli-version }}
       QA_CONCURRENCY: '4'
