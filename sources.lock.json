@@ -28,5 +28,11 @@
     "ref": "main",
     "repo": "https://github.com/dotproto/webextension-demos",
     "fetchedAt": "2026-11-15T17:45:00.383Z"
+  },
+  "ubol": {
+    "sha": "a58a26f1f76c9d880f406c53cbe4cb7f3e284e36",
+    "ref": "main",
+    "repo": "https://github.com/uBlockOrigin/uBOL-home",
+    "fetchedAt": "2026-11-15T17:45:01.368Z"
   }
 }

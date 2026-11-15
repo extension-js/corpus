@@ -197,7 +197,7 @@ function main() {
   for (const src of VENDORED ? loadSources() : enabledSources()) {
     if (VENDORED) {
       if (!src.vendorDir) {
-        if (src.enabled) console.error(`! ${src.id}: enabled but has no vendorDir: absent from vendored run`)
+        if (src.enabled && src.gate !== false) console.error(`! ${src.id}: enabled but has no vendorDir: absent from vendored run`)
         continue
       }
       const base = path.join(ROOT, src.vendorDir)

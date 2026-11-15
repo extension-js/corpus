@@ -35,6 +35,12 @@ export function enabledSources() {
   return loadSources().filter((s) => s.enabled)
 }
 
+// Sources with `gate: false` are built and reported, and never decide the
+// verdict: real extensions that carry their own bundler output or upstream churn.
+export function reportOnlySources() {
+  return new Set(loadSources().filter((s) => s.gate === false).map((s) => s.id))
+}
+
 // Samples excluded from framework accounting (sample-side / upstream faults).
 export function loadSkips() {
   return readJson(path.join(ROOT, 'skips.json'), {skips: {}}).skips || {}

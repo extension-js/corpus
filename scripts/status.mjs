@@ -12,7 +12,7 @@
 //   RE-BASELINE      scoring criteria changed since baseline          → exit 0 (neutral)
 //
 // QA_STRICT=1 exits 1 on any framework failure, criteria change or not.
-import {REPORTS_DIR, readJson, fs, path} from './lib/util.mjs'
+import {REPORTS_DIR, readJson, reportOnlySources, fs, path} from './lib/util.mjs'
 
 // Failures are reported as ids, which says nothing about cause. When one error
 // text accounts for most of them the run is usually environmental, not a corpus
@@ -21,7 +21,9 @@ function dominantFailureReason() {
   const latest = readJson(path.join(REPORTS_DIR, 'latest.json'), null)
   if (!latest || !Array.isArray(latest.results)) return null
   const counts = new Map()
+  const reportOnly = reportOnlySources()
   for (const row of latest.results) {
+    if (reportOnly.has(row.source)) continue
     for (const result of Object.values(row.browsers || {})) {
       if (!result || result.status === 'pass' || result.status === 'skip') continue
       const reason = String(result.error || '(no error captured)').split('\n')[0].trim().slice(0, 200)
@@ -64,6 +66,11 @@ function main() {
       : []),
     `**Framework failures:** ${f.failures.length}${f.failures.length ? '\n' + f.failures.map((id) => `- ❌ \`${id}\``).join('\n') : ''}`,
     `**Confirmed regressions:** ${regressions.length}${regressions.length ? '\n' + regressions.map((id) => `- 🔴 \`${id}\``).join('\n') : ''}`,
+    ...(diff.reporting && diff.reporting.total
+      ? [
+          `**Report-only sources (${diff.reporting.sources.join(', ')}):** ${diff.reporting.pass}/${diff.reporting.attempted} pass, not part of the verdict${diff.reporting.failures.length ? '\n' + diff.reporting.failures.map((id) => `- ⚠️ \`${id}\``).join('\n') : ''}`
+        ]
+      : []),
     `**Progressions:** ${diff.progressions.length} · **Criteria:** \`${diff.criteria.hash}\`${skew ? ' (changed: re-baseline required, not a regression)' : ''}`
   ]
   const summary = lines.join('\n') + '\n'

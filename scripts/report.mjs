@@ -12,9 +12,10 @@
 //   --update    overwrite baseline.json with current verdicts (accept state)
 //   --markdown  write reports/REPORT.md (for the weekly issue body)
 import crypto from 'node:crypto'
-import {ROOT, REPORTS_DIR, readJson, writeJson, loadSkips, fs, path} from './lib/util.mjs'
+import {ROOT, REPORTS_DIR, readJson, writeJson, loadSkips, reportOnlySources, fs, path} from './lib/util.mjs'
 
 const SKIPS = loadSkips()
+const REPORT_ONLY = reportOnlySources()
 
 // A baseline is only comparable to a run scored under the SAME rules. This
 // fingerprints the scoring criteria (integrity on/off, target browsers, skip
@@ -66,12 +67,28 @@ function frameworkHealth(results) {
   }
 }
 
+// Report-only sources: same builds, same checks, counted on their own line.
+// Nothing here reaches the verdict, the regression list or the baseline.
+function reportOnlyHealth(results) {
+  const attempted = results.filter((r) => !SKIPS[r.id])
+  const failures = attempted.filter((r) => !isPass(verdictKey(r.browsers)))
+  return {
+    sources: [...new Set(results.map((r) => r.source))].sort(),
+    total: results.length,
+    attempted: attempted.length,
+    pass: attempted.length - failures.length,
+    failures: failures.map((r) => r.id)
+  }
+}
+
 function isPass(key) {
   return key !== 'skip' && !/=fail|=timeout/.test(key)
 }
 
 function main() {
-  const latest = readJson(path.join(REPORTS_DIR, 'latest.json'))
+  const run = readJson(path.join(REPORTS_DIR, 'latest.json'))
+  const reporting = reportOnlyHealth(run.results.filter((r) => REPORT_ONLY.has(r.source)))
+  const latest = {...run, results: run.results.filter((r) => !REPORT_ONLY.has(r.source))}
   // --no-baseline: report framework health on whatever ran (e.g. a push smoke
   // subset) without diffing a full-corpus baseline — avoids spurious skew/removed.
   const baseline = args.includes('--no-baseline') ? {samples: {}} : readJson(BASELINE, {samples: {}})
@@ -122,6 +139,7 @@ function main() {
     baselineCriteria: baseline.criteria || null,
     totals: latest.totals,
     framework,
+    reporting,
     regressions,
     progressions,
     added,
@@ -174,6 +192,12 @@ function main() {
       `  ·  ${f.skipped} skipped (sample-side/upstream)  ·  ${f.failures.length} framework failures`
   )
   for (const id of f.failures) console.log(`  ✗ FRAMEWORK FAIL ${id}`)
+  if (reporting.total) {
+    console.log(
+      `Report-only sources (${reporting.sources.join(', ')}): ${reporting.pass}/${reporting.attempted} pass  ·  not part of the verdict`
+    )
+    for (const id of reporting.failures) console.log(`  ! REPORT-ONLY FAIL ${id}`)
+  }
 
   // Fail CI only on regressions, so the weekly job goes red exactly when the
   // shipped CLI got worse at building real extensions.
@@ -196,6 +220,15 @@ ${d.criteriaSkew ? `\n> ⚠️ **Criteria changed since baseline** (\`${d.baseli
 **${d.framework.pass}/${d.framework.attempted}** buildable samples pass (**${((d.framework.pass / d.framework.attempted) * 100).toFixed(1)}%**) · ${d.framework.skipped} skipped (sample-side/upstream) · **${d.framework.failures.length} framework failures**
 ${d.framework.failures.length ? d.framework.failures.map((id) => `- ❌ \`${id}\``).join('\n') : '_none: Extension.js builds every buildable sample_'}
 
+${
+  d.reporting.total
+    ? `
+## Report-only sources (${d.reporting.sources.join(', ')})
+**${d.reporting.pass}/${d.reporting.attempted}** pass. These builds are reported and are not part of the verdict.
+${d.reporting.failures.length ? d.reporting.failures.map((id) => `- ⚠️ \`${id}\``).join('\n') : '_none failing_'}
+`
+    : ''
+}
 ## Totals (raw, incl. skips)
 \`\`\`json
 ${JSON.stringify(d.totals, null, 2)}

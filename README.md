@@ -31,6 +31,8 @@ Each folder is a copy of its source at one pinned commit. `VENDORED.json` in the
 
 Of the 528 samples, 244 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 244 cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 240 buildable samples, and a failure in any of them is an Extension.js defect.
 
+Weekly QA also builds one source it only reports: the release builds of [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home), a real extension as its maintainers ship it. The result is printed under the verdict and never changes it. That source is not vendored, so the release gate does not build it.
+
 ## Browsers
 
 <div align="center">
@@ -96,7 +98,7 @@ npm run discover:vendored   # regenerate catalog.json
 npm run baseline:update     # accept the run as the new baseline
 ```
 
-To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed. Check the license first: a source joins only when its license allows a redistributed copy, and the entry records the SPDX id. Set `sparse: true` for a repository far larger than its samples.
+To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed. Check the license first: a source joins only when its license allows a redistributed copy, and the entry records the SPDX id. Set `sparse: true` for a repository far larger than its samples, and `gate: false` for a source that is reported and never decides the verdict.
 
 ## License
 

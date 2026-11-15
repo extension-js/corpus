@@ -1,5 +1,5 @@
 {
-  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. Add a new browser ecosystem by adding an entry here: no code changes needed.",
+  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. `gate: false` marks a report-only source: the weekly run builds and reports it, its results never reach the verdict or the baseline, and with no `vendorDir` it is absent from the release gate. Add a new browser ecosystem by adding an entry here: no code changes needed.",
   "sources": [
     {
       "id": "mdn",
@@ -103,6 +103,26 @@
       "enabled": true,
       "license": "MIT",
       "vendorDir": "webextension-demos"
+    },
+    {
+      "id": "ubol",
+      "name": "uBlock Origin Lite release builds",
+      "repo": "https://github.com/uBlockOrigin/uBOL-home",
+      "ref": "main",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "scan": [
+        "chromium",
+        "firefox"
+      ],
+      "ignore": [
+        "node_modules"
+      ],
+      "sparse": true,
+      "enabled": true,
+      "gate": false,
+      "license": "GPL-3.0",
+      "note": "A real extension, as its maintainers ship it. Report-only and not vendored: the two builds are about 65 MB."
     },
     {
       "id": "chromium",
