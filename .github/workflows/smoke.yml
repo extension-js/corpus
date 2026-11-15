@@ -17,6 +17,7 @@ on:
       - 'chrome/**'
       - 'chromium/**'
       - 'extension.js/**'
+      - 'wpt/**'
       - '.github/workflows/smoke.yml'
   pull_request:
     paths:
@@ -28,6 +29,7 @@ on:
       - 'chrome/**'
       - 'chromium/**'
       - 'extension.js/**'
+      - 'wpt/**'
   workflow_dispatch:
 
 jobs:

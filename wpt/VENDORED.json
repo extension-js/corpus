@@ -1,0 +1,18 @@
+{
+  "source": "wpt",
+  "name": "web-platform-tests WebExtensions test extensions",
+  "repo": "https://github.com/web-platform-tests/wpt",
+  "ref": "master",
+  "sha": "4fc3e21bbb603b397fca38129b1b8363019d3407",
+  "vendoredAt": "2026-11-15T17:45:01.426Z",
+  "scan": [
+    "web-extensions/resources"
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules"
+  ],
+  "treeHash": "996892f3eefa53e6",
+  "files": 14,
+  "bytes": 36242
+}

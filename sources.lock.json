@@ -16,5 +16,11 @@
     "ref": "main",
     "repo": "https://github.com/extension-js/examples",
     "fetchedAt": "2026-11-14T17:37:19.336Z"
+  },
+  "wpt": {
+    "sha": "4fc3e21bbb603b397fca38129b1b8363019d3407",
+    "ref": "master",
+    "repo": "https://github.com/web-platform-tests/wpt",
+    "fetchedAt": "2026-11-15T17:44:59.865Z"
   }
 }

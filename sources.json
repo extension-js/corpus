@@ -67,6 +67,24 @@
       "vendorDir": "extension.js"
     },
     {
+      "id": "wpt",
+      "name": "web-platform-tests WebExtensions test extensions",
+      "repo": "https://github.com/web-platform-tests/wpt",
+      "ref": "master",
+      "api": "browser",
+      "layout": "manifest-root",
+      "scan": [
+        "web-extensions/resources"
+      ],
+      "ignore": [
+        "node_modules"
+      ],
+      "sparse": true,
+      "enabled": true,
+      "license": "BSD-3-Clause",
+      "vendorDir": "wpt"
+    },
+    {
       "id": "chromium",
       "name": "Chromium test extensions",
       "repo": "https://chromium.googlesource.com/chromium/src",
