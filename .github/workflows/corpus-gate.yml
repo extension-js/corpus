@@ -94,7 +94,7 @@ jobs:
 
   # Safari builds through Xcode, so this lane needs macOS. It converts and
   # builds every sample for Safari and opens no browser. A failing build fails
-  # the call, whatever baseline.safari.json holds.
+  # the call.
   safari:
     if: ${{ inputs.safari == true }}
     runs-on: macos-latest
@@ -115,11 +115,10 @@ jobs:
       - run: node scripts/vendor.mjs --check
       - run: node scripts/discover.mjs --vendored
       - run: node scripts/run-matrix.mjs --tier all --install --browsers safari
+      # The Safari baseline holds four browsers, and this lane builds one, so
+      # it reports health with no baseline. Any failing build fails the lane.
       - name: Report
-        run: node scripts/report.mjs --markdown --baseline baseline.safari.json
-        continue-on-error: true
-      - name: Confirm regressions
-        run: node scripts/confirm-regressions.mjs
+        run: node scripts/report.mjs --markdown --no-baseline
         continue-on-error: true
       - name: Status
         run: node scripts/status.mjs

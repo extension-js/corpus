@@ -7,7 +7,7 @@
 
 > Real browser extensions, built with every [Extension.js](https://github.com/extension-js/extension.js) release before it ships.
 
-This repository holds 520 extension samples from four upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox and Edge, and answers `CLEAN` or `NOT CLEAN`.
+This repository holds 520 extension samples from four upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox, Edge and Safari, and answers `CLEAN` or `NOT CLEAN`.
 
 ```
 ✅ CLEAN · 4.1.39
@@ -35,31 +35,31 @@ Of the 520 samples, 236 are in the build matrix. The rest are kept as data: arch
 
 | <img alt="Chrome" src="https://media.extension.land/logos/browsers/chrome.svg" width="70"> | <img alt="Edge" src="https://media.extension.land/logos/browsers/edge.svg" width="70"> | <img alt="Firefox" src="https://media.extension.land/logos/browsers/firefox.svg" width="70"> | <img alt="Safari" src="https://media.extension.land/logos/browsers/safari.svg" width="70"> |
 | :-: | :-: | :-: | :-: |
-| <sup>Google Chrome<br>✅ Every release</sup> | <sup>Microsoft Edge<br>✅ Every release</sup> | <sup>Mozilla Firefox<br>✅ Every release</sup> | <sup>Apple Safari<br>✅ Weekly, on macOS</sup> |
+| <sup>Google Chrome<br>✅ Every release</sup> | <sup>Microsoft Edge<br>✅ Every release</sup> | <sup>Mozilla Firefox<br>✅ Every release</sup> | <sup>Apple Safari<br>✅ Every release</sup> |
 
 </div>
 
-Every sample is built once per browser. Safari builds go through Xcode, so they run on macOS only.
+Every sample is built once per browser. Safari builds go through the converter and Xcode on a macOS runner, and nothing opens Safari: the corpus proves the build, not the run.
 
 ## What a run checks
 
 1. The vendored folders match their recorded hashes.
 2. Each sample builds in its own throwaway workspace, once per browser.
 3. Every file the emitted `manifest.json` names exists in the output. A build that exits 0 and drops an icon is a failure.
-4. The result is compared with [`baseline.json`](baseline.json), the last accepted run of a stable version. A failing sample is built again before it counts, so a flaky runner is not reported as a regression.
+4. The result is compared with [`baseline.json`](baseline.json), or [`baseline.safari.json`](baseline.safari.json) on macOS, the last accepted run of a stable version. A failing sample is built again before it counts, so a flaky runner is not reported as a regression.
 
 ## When it runs
 
 | Workflow | Scope | Effect |
 | :------- | :---- | :----- |
-| [Corpus gate](.github/workflows/corpus-gate.yml) | All 232 samples on Chrome, Firefox and Edge, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
-| [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`. A macOS lane adds Safari and does not gate | Opens an issue for a regression that survives a second build |
+| [Corpus gate](.github/workflows/corpus-gate.yml) | All 232 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
+| [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`, with Safari on a macOS lane | Opens an issue for a regression that survives a second build |
 | [Smoke](.github/workflows/smoke.yml) | 12 samples on Chrome and Firefox, on every push and pull request | Guards the harness itself |
 
 Run the gate by hand for any version on npm:
 
 ```bash
-gh workflow run corpus-gate.yml --repo extension-js/corpus -f cli-version=4.1.40-canary.458.001a6a0
+gh workflow run corpus-gate.yml --repo extension-js/corpus -f cli-version=4.1.40-canary.458.001a6a0 -f safari=true
 ```
 
 ## Run it locally

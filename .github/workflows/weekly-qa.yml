@@ -6,8 +6,7 @@ name: Weekly QA
 #
 # Two lanes:
 #   linux: chrome,firefox,edge (the gating baseline → baseline.json)
-#   macos: safari + the chromium browsers, non-gating until a stable Safari
-#            baseline exists (→ baseline.safari.json)
+#   macos: safari + the chromium browsers (→ baseline.safari.json)
 on:
   schedule:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
@@ -87,7 +86,6 @@ jobs:
   macos:
     runs-on: macos-latest # Safari builds via Xcode: macOS only
     timeout-minutes: 90
-    continue-on-error: true # non-gating until a stable Safari baseline is recorded
     env:
       EXTENSION_TAG: ${{ github.event.inputs.extension_tag || 'latest' }}
       QA_CONCURRENCY: '4'
@@ -101,9 +99,8 @@ jobs:
       - run: node scripts/run-matrix.mjs --tier all --install --browsers chrome,firefox,edge,safari
       - run: node scripts/report.mjs --markdown --baseline baseline.safari.json
         continue-on-error: true
-      # No continue-on-error here: the job is already non-gating at job level, and
-      # a swallowed verdict step made this lane report a green tick over a
-      # 0-of-218 NOT CLEAN run on 2026-08-03.
+      # No continue-on-error here: a swallowed verdict step made this lane
+      # report a green tick over a 0-of-218 NOT CLEAN run on 2026-08-03.
       - name: Status
         run: node scripts/status.mjs
       - if: always()
