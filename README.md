@@ -1,6 +1,6 @@
-[weekly-image]: https://img.shields.io/github/actions/workflow/status/extension-js/corpus/weekly-qa.yml?branch=main&label=Weekly%20QA&color=0065e6
+[weekly-image]: https://img.shields.io/github/actions/workflow/status/extension-js/corpus/weekly-qa.yml?branch=main&label=Weekly%20QA
 [weekly-url]: https://github.com/extension-js/corpus/actions/workflows/weekly-qa.yml
-[smoke-image]: https://img.shields.io/github/actions/workflow/status/extension-js/corpus/smoke.yml?branch=main&label=Smoke&color=0065e6
+[smoke-image]: https://img.shields.io/github/actions/workflow/status/extension-js/corpus/smoke.yml?branch=main&label=Smoke
 [smoke-url]: https://github.com/extension-js/corpus/actions/workflows/smoke.yml
 
 # Corpus [![Weekly QA][weekly-image]][weekly-url] [![Smoke][smoke-image]][smoke-url]
