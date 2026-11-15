@@ -1,7 +1,7 @@
-# Browser Extension Test Data
+# Corpus
 
-[![Weekly QA](https://github.com/cezaraugusto/browser-extension-test-data/actions/workflows/weekly-qa.yml/badge.svg)](https://github.com/cezaraugusto/browser-extension-test-data/actions/workflows/weekly-qa.yml)
-[![Smoke](https://github.com/cezaraugusto/browser-extension-test-data/actions/workflows/smoke.yml/badge.svg)](https://github.com/cezaraugusto/browser-extension-test-data/actions/workflows/smoke.yml)
+[![Weekly QA](https://github.com/extension-js/corpus/actions/workflows/weekly-qa.yml/badge.svg)](https://github.com/extension-js/corpus/actions/workflows/weekly-qa.yml)
+[![Smoke](https://github.com/extension-js/corpus/actions/workflows/smoke.yml/badge.svg)](https://github.com/extension-js/corpus/actions/workflows/smoke.yml)
 
 Real-world proof that [Extension.js](https://github.com/extension-js/extension.js) builds the extensions people actually ship.
 

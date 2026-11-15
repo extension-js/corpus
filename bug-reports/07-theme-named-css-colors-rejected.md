@@ -62,9 +62,9 @@ for Chromium targets. Firefox output should keep the author's value verbatim.
 
 ## Corpus evidence
 
-- Weekly QA run [30912374327](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30912374327)
+- Weekly QA run [30912374327](https://github.com/extension-js/corpus/actions/runs/30912374327)
   (2026-08-04, `extension@4.0.28`): 217/218, single framework failure
   `mdn/themes/temp`, chrome:fail firefox:pass edge:fail, confirmed twice by re-run.
-- Weekly QA run [30819326430](https://github.com/cezaraugusto/browser-extension-test-data/actions/runs/30819326430)
+- Weekly QA run [30819326430](https://github.com/extension-js/corpus/actions/runs/30819326430)
   (2026-08-03, `extension@4.0.27`): 213/218, all five theme failures including
   the hex-only samples.

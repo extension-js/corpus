@@ -56,7 +56,7 @@ jobs:
       # A called workflow checks out the caller by default, so name this one.
       - uses: actions/checkout@v7
         with:
-          repository: cezaraugusto/browser-extension-test-data
+          repository: extension-js/corpus
           ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7

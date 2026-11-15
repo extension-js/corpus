@@ -1,5 +1,5 @@
 {
-  "name": "browser-extension-test-data",
+  "name": "corpus",
   "version": "2.0.0",
   "private": true,
   "description": "Real-world browser-extension corpus + automated QA testbed: vendored, validated samples from MDN, Chrome, Chromium, and Extension.js (see catalog.json), built weekly against the published Extension.js CLI.",

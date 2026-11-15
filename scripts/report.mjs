@@ -185,7 +185,7 @@ function table(rows) {
 }
 
 function markdown(d) {
-  return `# Browser Extension Test Data: Weekly QA
+  return `# Corpus: Weekly QA
 
 **CLI under test:** \`${d.cli}\` (resolved \`${d.cliVersion}\`)
 **Platform:** ${d.platform} · **Tier:** ${d.tier} · **Criteria:** \`${d.criteria.hash}\`
