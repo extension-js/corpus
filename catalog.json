@@ -1,6 +1,6 @@
 {
   "$comment": "Committed index of every vendored sample in this repo. Consume this instead of walking for manifest.json: project-root samples keep their manifest under src/ and the sample root (this `dir`) is the only correct build root. `matrix: false` marks catalog-only data the QA matrix never builds (archived or intentionally-broken samples included on purpose).",
-  "generatedAt": "2026-11-14T21:13:33.245Z",
+  "generatedAt": "2026-11-15T17:45:12.112Z",
   "sources": {
     "mdn": {
       "vendorDir": "mdn",
@@ -26,6 +26,22 @@
       "matrixSamples": 60,
       "catalogOnlySamples": 0
     },
+    "wpt": {
+      "vendorDir": "wpt",
+      "sha": "4fc3e21bbb603b397fca38129b1b8363019d3407",
+      "ref": "master",
+      "repo": "https://github.com/web-platform-tests/wpt",
+      "matrixSamples": 6,
+      "catalogOnlySamples": 0
+    },
+    "webextension-demos": {
+      "vendorDir": "webextension-demos",
+      "sha": "52bbea7d92eb7db4f6c272de0bc6867803c04cdd",
+      "ref": "main",
+      "repo": "https://github.com/dotproto/webextension-demos",
+      "matrixSamples": 2,
+      "catalogOnlySamples": 0
+    },
     "chromium": {
       "vendorDir": "chromium",
       "frozen": true,
@@ -34,7 +50,7 @@
       "catalogOnlySamples": 87
     }
   },
-  "count": 520,
+  "count": 528,
   "samples": [
     {
       "id": "chrome/_archive/apps/samples/analytics",
@@ -8638,6 +8654,145 @@
       "hasBuildStep": false,
       "entrypoints": [
         "sidebar"
+      ]
+    },
+    {
+      "id": "webextension-demos/demos/sidebar_window_focus",
+      "source": "webextension-demos",
+      "dir": "webextension-demos/demos/sidebar_window_focus",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "Sidebar Window Focus Demo",
+      "manifest": "webextension-demos/demos/sidebar_window_focus/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "action",
+        "sidebar"
+      ]
+    },
+    {
+      "id": "webextension-demos/testing/private-browsing-web-storage",
+      "source": "webextension-demos",
+      "dir": "webextension-demos/testing/private-browsing-web-storage",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "Private Browsing Web Storage Test",
+      "manifest": "webextension-demos/testing/private-browsing-web-storage/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "action"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/alarms",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/alarms",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "WPT browser.alarms Test",
+      "manifest": "wpt/web-extensions/resources/alarms/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/bookmarks",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/bookmarks",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "WPT browser.bookmarks Test",
+      "manifest": "wpt/web-extensions/resources/bookmarks/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/browsingData",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/browsingData",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "WPT browser.browsingData Test",
+      "manifest": "wpt/web-extensions/resources/browsingData/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/idle",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/idle",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "browser.idle WPT",
+      "manifest": "wpt/web-extensions/resources/idle/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/runtime",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/runtime",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "BrowserRuntimeTestExtension",
+      "manifest": "wpt/web-extensions/resources/runtime/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
+    },
+    {
+      "id": "wpt/web-extensions/resources/storage",
+      "source": "wpt",
+      "dir": "wpt/web-extensions/resources/storage",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "browser.storage WPT",
+      "manifest": "wpt/web-extensions/resources/storage/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
       ]
     }
   ]

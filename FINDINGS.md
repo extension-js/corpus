@@ -1,6 +1,34 @@
 # QA Findings
 
-## Current reading (2026-11-14)
+## Current reading (2026-11-15)
+
+**CLI:** `extension@4.1.39` · **Platform:** macOS (local run of the gate's steps) · **Targets:** chrome, firefox, edge
+**Corpus:** 244 discovered samples, 240 attempted, 4 skipped (sample-side/upstream)
+**Run:** local, vendored samples, `tier=all --install`, concurrency 6, criteria `a45441489280`
+
+**240 / 240 (100%) build cleanly**, 720 builds, no failure and no timeout on
+any target. Every passing build had its emitted manifest checked against
+`dist/` (2,892 referenced files, none missing).
+
+Two sources joined, eight samples, and nothing else moved:
+
+- `wpt`, the six test extensions under `web-extensions/resources/` of
+  web-platform-tests (BSD-3-Clause), pinned at `4fc3e21bbb`. Each declares
+  `background.scripts` and `background.service_worker` side by side.
+- `webextension-demos`, two samples from `dotproto/webextension-demos` (MIT),
+  pinned at `52bbea7d92`. One pairs `background.page` with a service worker
+  and `sidebar_action` with `side_panel`.
+
+The skip list did not change, so the criteria hash is the same and the run
+was diffed against the 2026-11-14 baseline before it replaced it: no
+regression, eight new samples. The other vendored folders stay at the cut
+that reading validated. `extension-js/examples` has moved since, and that
+refresh is its own commit.
+
+Safari was not built for the eight new samples in this reading. The macOS
+lanes are the first to build them, and `baseline.safari.json` is unchanged.
+
+## Earlier reading (2026-11-14)
 
 **CLI:** `extension@4.1.39` · **Platform:** macOS (local run of the Linux lane's steps) · **Targets:** chrome, firefox, edge
 **Corpus:** 236 discovered samples, 232 attempted, 4 skipped (sample-side/upstream)

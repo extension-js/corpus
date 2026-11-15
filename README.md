@@ -7,11 +7,11 @@
 
 > Real browser extensions, built with every [Extension.js](https://github.com/extension-js/extension.js) release before it ships.
 
-This repository holds 520 extension samples from four upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox, Edge and Safari, and answers `CLEAN` or `NOT CLEAN`.
+This repository holds 528 extension samples from six upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox, Edge and Safari, and answers `CLEAN` or `NOT CLEAN`.
 
 ```
 ✅ CLEAN · 4.1.39
-Framework health: 232/232 buildable samples pass (100.0%) · 4 skipped (sample-side/upstream)
+Framework health: 240/240 buildable samples pass (100.0%) · 4 skipped (sample-side/upstream)
 ```
 
 [Extension.js](https://github.com/extension-js/extension.js) · [Templates](https://github.com/extension-js/templates) · [Documentation](https://extension.js.org/docs) · [Release process](https://github.com/extension-js/extension.js/blob/main/docs/RELEASING.md)
@@ -24,10 +24,12 @@ Framework health: 232/232 buildable samples pass (100.0%) · 4 skipped (sample-s
 | [`chromium/`](chromium) | Chromium test extensions, a frozen subset that includes broken manifests on purpose | 87 |
 | [`mdn/`](mdn) | [mdn/webextensions-examples](https://github.com/mdn/webextensions-examples) | 71 |
 | [`extension.js/`](extension.js) | Extension.js first-party examples | 60 |
+| [`wpt/`](wpt) | [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt), the test extensions under `web-extensions/resources/` | 6 |
+| [`webextension-demos/`](webextension-demos) | [dotproto/webextension-demos](https://github.com/dotproto/webextension-demos) | 2 |
 
 Each folder is a copy of its source at one pinned commit. `VENDORED.json` in the folder records the source repository, that commit and a hash of the tree. Every run recomputes the hash, so a sample edited by hand fails the run.
 
-Of the 520 samples, 236 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 236 cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 232 buildable samples, and a failure in any of them is an Extension.js defect.
+Of the 528 samples, 244 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 244 cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 240 buildable samples, and a failure in any of them is an Extension.js defect.
 
 ## Browsers
 
@@ -52,7 +54,7 @@ Every sample is built once per browser. Safari builds go through the converter a
 
 | Workflow | Scope | Effect |
 | :------- | :---- | :----- |
-| [Corpus gate](.github/workflows/corpus-gate.yml) | All 232 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
+| [Corpus gate](.github/workflows/corpus-gate.yml) | All 240 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
 | [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`, with Safari on a macOS lane | Opens an issue for a regression that survives a second build |
 | [Smoke](.github/workflows/smoke.yml) | 12 samples on Chrome and Firefox, on every push and pull request | Guards the harness itself |
 
@@ -94,7 +96,7 @@ npm run discover:vendored   # regenerate catalog.json
 npm run baseline:update     # accept the run as the new baseline
 ```
 
-To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed.
+To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed. Check the license first: a source joins only when its license allows a redistributed copy, and the entry records the SPDX id. Set `sparse: true` for a repository far larger than its samples.
 
 ## License
 

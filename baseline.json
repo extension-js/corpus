@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-11-14T17:53:43.978Z",
-  "runAt": "2026-11-14T17:52:04.749Z",
+  "updatedAt": "2026-11-15T17:48:52.775Z",
+  "runAt": "2026-11-15T17:48:34.699Z",
   "cli": "extension@4.1.39",
   "cliVersion": "4.1.39",
   "platform": "darwin",
@@ -10,8 +10,8 @@
     "edge"
   ],
   "corpus": {
-    "discovered": 236,
-    "attempted": 232,
+    "discovered": 244,
+    "attempted": 240,
     "skipped": 4
   },
   "criteria": {
@@ -265,6 +265,14 @@
     "mdn/user-script-register": "chrome=pass,edge=pass,firefox=pass",
     "mdn/userScripts-mv3": "chrome=pass,edge=pass,firefox=pass",
     "mdn/webpack-modules/addon": "skip",
-    "mdn/window-manipulator": "chrome=pass,edge=pass,firefox=pass"
+    "mdn/window-manipulator": "chrome=pass,edge=pass,firefox=pass",
+    "webextension-demos/demos/sidebar_window_focus": "chrome=pass,edge=pass,firefox=pass",
+    "webextension-demos/testing/private-browsing-web-storage": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/alarms": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/bookmarks": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/browsingData": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/idle": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/runtime": "chrome=pass,edge=pass,firefox=pass",
+    "wpt/web-extensions/resources/storage": "chrome=pass,edge=pass,firefox=pass"
   }
 }
