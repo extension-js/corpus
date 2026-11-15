@@ -10,16 +10,27 @@ import {ROOT, CACHE_DIR, enabledSources, exec, readJson, writeJson, ensureDir, f
 
 const LOCK = path.join(ROOT, 'sources.lock.json')
 
+// A bare name matches every ref that ends with it (refs/heads/someone/master
+// sorts before refs/heads/master), so ask for the branch by its full name first.
 function remoteSha(repo, ref) {
-  const r = exec('git', ['ls-remote', repo, ref])
-  if (!r.ok) return null
-  const line = r.stdout.split('\n').find(Boolean)
-  return line ? line.split('\t')[0] : null
+  for (const name of [`refs/heads/${ref}`, ref]) {
+    const r = exec('git', ['ls-remote', repo, name])
+    if (!r.ok) return null
+    const line = r.stdout.split('\n').find(Boolean)
+    if (line) return line.split('\t')[0]
+  }
+  return null
 }
 
-function clone(repo, ref, dest) {
+// `sparse: true` fetches only the scan trees (plus the repository's root files,
+// so its license still travels). For an upstream far larger than its samples.
+function clone(src, dest) {
   fs.rmSync(dest, {recursive: true, force: true})
-  return exec('git', ['clone', '--depth', '1', '--branch', ref, repo, dest])
+  if (!src.sparse) return exec('git', ['clone', '--depth', '1', '--branch', src.ref, src.repo, dest])
+  const c = exec('git', ['clone', '--depth', '1', '--branch', src.ref, '--filter=blob:none', '--sparse', src.repo, dest])
+  if (!c.ok) return c
+  const trees = [...src.scan, ...(src.vendorInclude || [])]
+  return exec('git', ['sparse-checkout', 'set', ...trees], {cwd: dest})
 }
 
 async function main() {
@@ -39,7 +50,7 @@ async function main() {
     const prev = lock[src.id]?.sha
     const isChanged = prev !== latest
     if (isChanged || !fs.existsSync(path.join(dest, '.git'))) {
-      const c = clone(src.repo, src.ref, dest)
+      const c = clone(src, dest)
       if (!c.ok) {
         summary.push({id: src.id, status: 'clone-failed'})
         console.error(`✗ ${src.id}: clone failed\n${c.stderr}`)
