@@ -42,6 +42,38 @@ entries (archived Chrome samples and Chromium test extensions with a license
 header in the manifest) from `unparseable-manifest` to valid. None of them is
 in the build matrix.
 
+### Built extensions (2026-11-16)
+
+Three real extensions that need their own build first joined as report-only
+sources that are not vendored. `scripts/build-sources.mjs` fetched each at its
+pinned commit, installed it with `npm ci --ignore-scripts` from a registry-only
+lockfile, and ran its own build. No install script was needed by any of them.
+Timings are from an empty cache on a 10-core machine, Node 24.18.1.
+
+| Source | License | Pinned at | Install | Build | Output folders | chrome | firefox |
+| :----- | :------ | :-------- | ------: | ----: | :------------- | :----- | :------ |
+| `dark-reader` | MIT, `LICENSE` | `ad17337499` | 3.0 s | 24.6 s | `build/release/chrome-mv3`, `build/release/firefox` (6.4 MB) | 2 of 2 | 2 of 2 |
+| `obsidian-clipper` | MIT, `LICENSE` | `6d56d618b0` | 1.9 s | 33.7 s | `dist`, `dist_firefox` (38.9 MB) | 2 of 2 | 2 of 2 |
+| `refined-github` | MIT, `license` | `bcac6b9d51` | 3.1 s | 3.1 s | `distribution` (1.4 MB) | 1 of 1 | 1 of 1 |
+
+Five samples, 10 builds on `extension@4.1.41`, all pass, in 6 s. The whole
+lane took 81 s locally.
+
+A pass here means the build exited 0 and every file the emitted manifest names
+exists. It does not mean the output still works. Comparing Dark Reader's
+release folder with what `extension build` wrote from it shows the `config/`
+folder gone, six site lists the service worker fetches at runtime, with no
+warning. Filed as
+[bug 09](bug-reports/09-runtime-fetched-file-dropped-without-warning.md).
+
+Not added, with the reason:
+
+- `violentmonkey/violentmonkey` (MIT), `openstyles/stylus` (GPL-3.0) and
+  `scriptscat/scriptcat` (GPL-3.0) keep a pnpm lockfile. The runner reads
+  `package-lock.json` only, so it refuses them until it learns pnpm.
+- `ajayyy/SponsorBlock` (GPL-3.0) was not tried: the first two candidates
+  built, and it keeps part of its source in submodules.
+
 ## Earlier reading (2026-11-15)
 
 **CLI:** `extension@4.1.39` · **Platform:** macOS (local run of the gate's steps) · **Targets:** chrome, firefox, edge
