@@ -1,0 +1,21 @@
+{
+  "source": "vimium",
+  "name": "Vimium",
+  "repo": "https://github.com/philc/vimium",
+  "ref": "master",
+  "sha": "4046615ae4128d485fce3335fc1032e6f87c630a",
+  "vendoredAt": "2026-11-16T17:54:18.433Z",
+  "scan": [
+    "."
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules",
+    "build",
+    "dist",
+    ".github"
+  ],
+  "treeHash": "390844003daf7cf1",
+  "files": 139,
+  "bytes": 874277
+}

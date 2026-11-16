@@ -1,6 +1,48 @@
 # QA Findings
 
-## Current reading (2026-11-15)
+## Current reading (2026-11-16)
+
+**CLI:** `extension@4.1.41` · **Platform:** macOS (local run of the gate's steps) · **Targets:** chrome, firefox
+**Corpus:** 248 discovered samples, 240 gating samples attempted, 4 skipped (sample-side/upstream), 4 report-only
+**Run:** local, vendored samples, `tier=all --install`, concurrency 6, read with `--no-baseline`
+
+**240 / 240 (100%) build cleanly** on the two targets, 486 passing builds with
+the report-only ones, and 2,045 files named by emitted manifests, none
+missing. Edge and Safari were not built in this reading, so `baseline.json`
+and `baseline.safari.json` are unchanged.
+
+Four real extensions joined as vendored, report-only sources. Each loads from
+source with no build step of its own:
+
+| Source | License | Pinned at | Sample | chrome | firefox |
+| :----- | :------ | :-------- | :----- | :----- | :------ |
+| `vimium` | MIT, `MIT-LICENSE.txt` | `4046615ae4` | `vimium` | fail | fail |
+| `privacy-badger` | GPL-3.0-or-later, `LICENSE` | `1bfff6bda7` | `privacy-badger/src` | pass | pass |
+| `keepassxc-browser` | GPL-3.0, `LICENSE` | `fab74af897` | `keepassxc-browser/keepassxc-browser` | pass | pass |
+| `multi-account-containers` | MPL-2.0, `LICENSE` | `a77ca17f78` | `multi-account-containers/src` | pass | pass |
+
+- `vimium` fails on both targets because its `manifest.json` carries comments
+  and the build refuses them. Browsers load that file, so this is an
+  Extension.js defect, filed as
+  [bug 08](bug-reports/08-manifest-json-with-comments-refused.md). The sample
+  stays in the matrix as a visible report-only failure and is not skipped.
+- `multi-account-containers` is a Firefox extension (Manifest V2,
+  `contextualIdentities`). The corpus builds every sample for every target, as
+  it does for the Firefox-only MDN examples, and the chrome build passes. Its
+  locales are a submodule, `mozilla-l10n/multi-account-containers-l10n`
+  (MPL-2.0, `LICENSE` at `71f06ce560`), fetched at the commit the upstream pins.
+- `keepassxc-browser` builds the Chromium manifest the repository commits. Its
+  Firefox manifest is a second file its own packaging script swaps in, so the
+  firefox target here builds the Chromium manifest.
+- `privacy-badger` is the largest at 13.6 MB, under the 20 MB vendoring line.
+
+Discovery now reads a manifest the way a browser does, comments allowed. That
+is what lets `vimium` into the matrix, and it also turns 19 catalog-only
+entries (archived Chrome samples and Chromium test extensions with a license
+header in the manifest) from `unparseable-manifest` to valid. None of them is
+in the build matrix.
+
+## Earlier reading (2026-11-15)
 
 **CLI:** `extension@4.1.39` · **Platform:** macOS (local run of the gate's steps) · **Targets:** chrome, firefox, edge
 **Corpus:** 244 discovered samples, 240 attempted, 4 skipped (sample-side/upstream)

@@ -5,9 +5,14 @@ Each report is self-contained: a committed, pristine repro under `repro/`, the e
 build command, full error output, and root-cause analysis. Hand the absolute path of
 a report to the Extension.js maintainer/AI.
 
-## 🟢 Nothing open on `extension@4.1.39`
+## 🔴 One open on `extension@4.1.41`
 
-The 2026-11-14 corpus run reads 232 of 232 with no framework failure.
+- **[Bug 08: a `manifest.json` that carries comments is refused](08-manifest-json-with-comments-refused.md)**:
+  open. The report-only sample `vimium` fails on chrome and firefox. It does
+  not gate: the 2026-11-16 run reads 240 of 240 on the gating samples.
+  Repro: `repro/08-manifest-with-comments`.
+
+## 🟢 Fixed
 
 - **[Bug 07: named CSS colors in `theme.colors` rejected for Chromium targets](07-theme-named-css-colors-rejected.md)**:
   fixed in `4.0.29`. `mdn/themes/temp` builds on chrome, firefox and edge.

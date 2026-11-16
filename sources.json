@@ -1,5 +1,5 @@
 {
-  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. `gate: false` marks a report-only source: the weekly run builds and reports it, its results never reach the verdict or the baseline, and with no `vendorDir` it is absent from the release gate. Add a new browser ecosystem by adding an entry here: no code changes needed.",
+  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. `submodules: true` also fetches the submodules at the commits the upstream pins. `gate: false` marks a report-only source: the weekly run builds and reports it, its results never reach the verdict or the baseline, and with no `vendorDir` it is absent from the release gate. A report-only source under 20 MB is vendored like any other, so the release gate builds and reports it too. Add a new browser ecosystem by adding an entry here: no code changes needed.",
   "sources": [
     {
       "id": "mdn",
@@ -123,6 +123,86 @@
       "gate": false,
       "license": "GPL-3.0",
       "note": "A real extension, as its maintainers ship it. Report-only and not vendored: the two builds are about 65 MB."
+    },
+    {
+      "id": "vimium",
+      "name": "Vimium",
+      "repo": "https://github.com/philc/vimium",
+      "ref": "master",
+      "api": "chrome",
+      "layout": "manifest-root",
+      "scan": [
+        "."
+      ],
+      "ignore": [
+        "node_modules",
+        "build",
+        "dist",
+        ".github"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "MIT",
+      "vendorDir": "vimium",
+      "note": "A real extension, loaded from its repository root. Report-only. Its manifest.json carries comments, which browsers accept."
+    },
+    {
+      "id": "privacy-badger",
+      "name": "Privacy Badger",
+      "repo": "https://github.com/EFForg/privacybadger",
+      "ref": "master",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "scan": [
+        "src"
+      ],
+      "ignore": [
+        "node_modules"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "GPL-3.0-or-later",
+      "vendorDir": "privacy-badger",
+      "note": "A real extension, loaded from src/ with no build step. Report-only."
+    },
+    {
+      "id": "keepassxc-browser",
+      "name": "KeePassXC-Browser",
+      "repo": "https://github.com/keepassxreboot/keepassxc-browser",
+      "ref": "develop",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "scan": [
+        "keepassxc-browser"
+      ],
+      "ignore": [
+        "node_modules"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "GPL-3.0",
+      "vendorDir": "keepassxc-browser",
+      "note": "A real extension, loaded from keepassxc-browser/ with the Chromium manifest the repository commits. Report-only."
+    },
+    {
+      "id": "multi-account-containers",
+      "name": "Firefox Multi-Account Containers",
+      "repo": "https://github.com/mozilla/multi-account-containers",
+      "ref": "main",
+      "api": "browser",
+      "layout": "manifest-root",
+      "scan": [
+        "src"
+      ],
+      "ignore": [
+        "node_modules"
+      ],
+      "submodules": true,
+      "enabled": true,
+      "gate": false,
+      "license": "MPL-2.0",
+      "vendorDir": "multi-account-containers",
+      "note": "A real Firefox extension, loaded from src/ with no build step. Its locales are a submodule (mozilla-l10n/multi-account-containers-l10n, MPL-2.0). Report-only."
     },
     {
       "id": "chromium",

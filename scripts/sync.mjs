@@ -6,9 +6,16 @@
 // the `changed` list to decide whether a full matrix re-run is warranted, but
 // `--all` / cron always runs regardless so CLI regressions surface even when
 // upstream is quiet.
+//
+// `--source id[,id]` syncs only the named sources and leaves every other lock
+// entry as it is, so adding one source does not move the others.
 import {ROOT, CACHE_DIR, enabledSources, exec, readJson, writeJson, ensureDir, fs, path} from './lib/util.mjs'
 
 const LOCK = path.join(ROOT, 'sources.lock.json')
+const ONLY = (() => {
+  const i = process.argv.indexOf('--source')
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1].split(',') : null
+})()
 
 // A bare name matches every ref that ends with it (refs/heads/someone/master
 // sorts before refs/heads/master), so ask for the branch by its full name first.
@@ -24,9 +31,15 @@ function remoteSha(repo, ref) {
 
 // `sparse: true` fetches only the scan trees (plus the repository's root files,
 // so its license still travels). For an upstream far larger than its samples.
+// `submodules: true` also fetches the submodules at the commits the upstream
+// pins, for a project that keeps part of the extension in a second repository.
 function clone(src, dest) {
   fs.rmSync(dest, {recursive: true, force: true})
-  if (!src.sparse) return exec('git', ['clone', '--depth', '1', '--branch', src.ref, src.repo, dest])
+  if (!src.sparse) {
+    const c = exec('git', ['clone', '--depth', '1', '--branch', src.ref, src.repo, dest])
+    if (!c.ok || !src.submodules) return c
+    return exec('git', ['submodule', 'update', '--init', '--depth', '1'], {cwd: dest})
+  }
   const c = exec('git', ['clone', '--depth', '1', '--branch', src.ref, '--filter=blob:none', '--sparse', src.repo, dest])
   if (!c.ok) return c
   const trees = [...src.scan, ...(src.vendorInclude || [])]
@@ -39,7 +52,7 @@ async function main() {
   const changed = []
   const summary = []
 
-  for (const src of enabledSources()) {
+  for (const src of enabledSources().filter((s) => !ONLY || ONLY.includes(s.id))) {
     const dest = path.join(CACHE_DIR, src.id)
     const latest = remoteSha(src.repo, src.ref)
     if (!latest) {

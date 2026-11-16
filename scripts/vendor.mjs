@@ -87,6 +87,9 @@ function copyTree(srcDir, destDir, pruneTop) {
     filter: (src) => {
       const base = path.basename(src)
       if (IGNORE_FILES.has(base)) return false
+      // A submodule keeps `.git` as a file, and it is no more sample content
+      // than the directory is.
+      if (base === '.git') return false
       if (PRUNE_ANY.has(base)) {
         try {
           if (fs.statSync(src).isDirectory()) return false

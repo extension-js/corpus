@@ -1,0 +1,18 @@
+{
+  "source": "privacy-badger",
+  "name": "Privacy Badger",
+  "repo": "https://github.com/EFForg/privacybadger",
+  "ref": "master",
+  "sha": "1bfff6bda70f7dc711ae4701ff9218241d1a3fd7",
+  "vendoredAt": "2026-11-16T17:54:18.559Z",
+  "scan": [
+    "src"
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules"
+  ],
+  "treeHash": "86027c8b2a5e69c2",
+  "files": 187,
+  "bytes": 13568469
+}
