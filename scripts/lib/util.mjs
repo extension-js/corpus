@@ -21,6 +21,17 @@ export function readJson(file, fallback = undefined) {
   }
 }
 
+// Chrome and Firefox both load a manifest.json that carries comments, so a
+// manifest is read the way a browser reads it. Strings are kept whole: a URL
+// holds `//` too.
+export function stripJsonComments(text) {
+  return text.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === '"' ? m : ''))
+}
+
+export function readManifest(file) {
+  return JSON.parse(stripJsonComments(fs.readFileSync(file, 'utf8')))
+}
+
 export function writeJson(file, data) {
   fs.mkdirSync(path.dirname(file), {recursive: true})
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n')

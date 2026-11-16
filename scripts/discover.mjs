@@ -28,7 +28,7 @@
 //                catalog instead of re-implementing this discovery, which matters
 //                because project-root samples keep their manifest under src/ and
 //                naive manifest-dir walkers would pick the wrong root.
-import {ROOT, CACHE_DIR, loadSources, enabledSources, readJson, writeJson, fs, path} from './lib/util.mjs'
+import {ROOT, CACHE_DIR, loadSources, enabledSources, readJson, readManifest, writeJson, fs, path} from './lib/util.mjs'
 
 const VENDORED = process.argv.includes('--vendored')
 
@@ -103,7 +103,7 @@ function classify(sampleRoot, manifestPath) {
   if (!manifestPath) return {valid: false, reason: 'no-manifest'}
   let manifest
   try {
-    manifest = readJson(manifestPath)
+    manifest = readManifest(manifestPath)
   } catch {
     return {valid: false, reason: 'unparseable-manifest'}
   }
@@ -152,7 +152,8 @@ function discoverSource(src, base, scanDirs) {
     const rel = path.relative(base, dir)
     return {
       source: src.id,
-      id: `${src.id}/${rel}`,
+      // A source scanned at `.` with its manifest at the root is one sample, named by the source id.
+      id: rel ? `${src.id}/${rel}` : src.id,
       rel,
       path: dir,
       layout,
