@@ -23,6 +23,7 @@
     "report": "node scripts/report.mjs --markdown",
     "status": "node scripts/status.mjs",
     "qa": "node scripts/sync.mjs && node scripts/discover.mjs && npm run matrix && node scripts/report.mjs --markdown && node scripts/status.mjs",
-    "baseline:update": "node scripts/report.mjs --update"
+    "baseline:update": "node scripts/report.mjs --update",
+    "built": "node scripts/build-sources.mjs && node scripts/discover.mjs && node scripts/run-matrix.mjs --tier raw --browsers chrome,firefox,edge && node scripts/report.mjs --no-baseline && node scripts/status.mjs"
   }
 }

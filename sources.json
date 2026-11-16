@@ -1,5 +1,5 @@
 {
-  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. `submodules: true` also fetches the submodules at the commits the upstream pins. `gate: false` marks a report-only source: the weekly run builds and reports it, its results never reach the verdict or the baseline, and with no `vendorDir` it is absent from the release gate. A report-only source under 20 MB is vendored like any other, so the release gate builds and reports it too. Add a new browser ecosystem by adding an entry here: no code changes needed.",
+  "$comment": "Registry of upstream extension-sample repositories. The weekly QA job clones each enabled source on-demand into .cache/<id> (gitignored), pins the tested commit in sources.lock.json, discovers samples under `scan`, and runs `extension build` against each. `layout` controls discovery: 'manifest-root' = a sample is any dir directly containing manifest.json (MDN/Chrome style); 'project-root' = each immediate child of a scan dir is a sample whose manifest lives somewhere beneath (e.g. src/manifest.json, Extension.js style). `vendorDir` names the tracked corpus dir vendor.mjs promotes validated snapshots into (the repo's browsable data product; see catalog.json). `vendorInclude` lists extra trees vendored for data value but excluded from the matrix; `vendorFrozen` marks a tracked corpus with no upstream sync (stamped + integrity-checked, never copied); `vendorScan` overrides scan for cataloging a frozen corpus. `sparse: true` clones only the scan trees and the repository's root files, for an upstream far larger than its samples. `submodules: true` also fetches the submodules at the commits the upstream pins. `gate: false` marks a report-only source: the weekly run builds and reports it, its results never reach the verdict or the baseline, and with no `vendorDir` it is absent from the release gate. A report-only source under 20 MB is vendored like any other, so the release gate builds and reports it too. A source with a `build` entry is a real extension that needs its own build first: build-sources.mjs fetches the full `commit` SHA, installs from the lockfile with install scripts off and from the npm registry only, runs `build.run` untouched, and `scan` names the output folders. Such a source is always report-only and never vendored. Add a new browser ecosystem by adding an entry here: no code changes needed.",
   "sources": [
     {
       "id": "mdn",
@@ -203,6 +203,77 @@
       "license": "MPL-2.0",
       "vendorDir": "multi-account-containers",
       "note": "A real Firefox extension, loaded from src/ with no build step. Its locales are a submodule (mozilla-l10n/multi-account-containers-l10n, MPL-2.0). Report-only."
+    },
+    {
+      "id": "dark-reader",
+      "name": "Dark Reader",
+      "repo": "https://github.com/darkreader/darkreader",
+      "ref": "main",
+      "commit": "ad173374991a7bc0a1651fb52eb3d9e18b224bec",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "build": {
+        "run": [
+          "npm",
+          "run",
+          "build"
+        ]
+      },
+      "scan": [
+        "build/release/chrome-mv3",
+        "build/release/firefox"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "MIT",
+      "note": "A real extension whose manifest is assembled by its own build. Built from the pinned commit by build-sources.mjs. Report-only and not vendored."
+    },
+    {
+      "id": "obsidian-clipper",
+      "name": "Obsidian Web Clipper",
+      "repo": "https://github.com/obsidianmd/obsidian-clipper",
+      "ref": "main",
+      "commit": "6d56d618b00bd970aa738d6a7a61edee27783e81",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "build": {
+        "run": [
+          "npm",
+          "run",
+          "build"
+        ]
+      },
+      "scan": [
+        "dist",
+        "dist_firefox"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "MIT",
+      "note": "A real extension bundled by its own webpack build, one manifest per browser. Built from the pinned commit by build-sources.mjs. Report-only and not vendored."
+    },
+    {
+      "id": "refined-github",
+      "name": "Refined GitHub",
+      "repo": "https://github.com/refined-github/refined-github",
+      "ref": "main",
+      "commit": "bcac6b9d5155681be1b0e4c22588ddd09ed72372",
+      "api": "mixed",
+      "layout": "manifest-root",
+      "build": {
+        "run": [
+          "npm",
+          "run",
+          "build"
+        ]
+      },
+      "scan": [
+        "distribution"
+      ],
+      "enabled": true,
+      "gate": false,
+      "license": "MIT",
+      "note": "A real extension whose manifest names files its own bundler writes. Built from the pinned commit by build-sources.mjs. Report-only and not vendored."
     },
     {
       "id": "chromium",

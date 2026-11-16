@@ -1,0 +1,52 @@
+name: Built extensions
+
+# Real extensions that need their own build before Extension.js has anything
+# to build. Each project is fetched at the commit sources.json pins, installed
+# from its lockfile with install scripts off, built with its own command, and
+# its output folders join the same matrix as every other sample.
+#
+# This lane reports and never gates. It is not part of the corpus gate or of
+# Weekly QA, the job cannot fail the run, and it is the only place a foreign
+# project's code runs: with a read-only token that is not left on disk.
+on:
+  schedule:
+    - cron: '30 6 * * 1' # Mondays 06:30 UTC
+  workflow_dispatch:
+    inputs:
+      extension_tag:
+        description: 'Extension.js version or dist-tag to test (latest | canary | 4.1.41)'
+        default: 'latest'
+  pull_request:
+    paths:
+      - 'scripts/build-sources.mjs'
+      - 'sources.json'
+      - '.github/workflows/built-extensions.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  built:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      EXTENSION_TAG: ${{ github.event.inputs.extension_tag || 'latest' }}
+      QA_CONCURRENCY: '6'
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      # Several of these projects ask for Node 24 in their own engines field.
+      - uses: actions/setup-node@v7
+        with: {node-version: 24}
+      - run: node scripts/assert-runtime-supported.mjs
+      # Always exits 0: a project that does not install or build is reported
+      # as one failing report-only sample.
+      - run: node scripts/build-sources.mjs
+      - run: node scripts/discover.mjs
+      - run: node scripts/run-matrix.mjs --tier raw --browsers chrome,firefox,edge
+      - run: node scripts/report.mjs --markdown --no-baseline
+      - run: node scripts/status.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: built-extensions-report, path: reports/}

@@ -5,12 +5,17 @@ Each report is self-contained: a committed, pristine repro under `repro/`, the e
 build command, full error output, and root-cause analysis. Hand the absolute path of
 a report to the Extension.js maintainer/AI.
 
-## 🔴 One open on `extension@4.1.41`
+## 🔴 Two open on `extension@4.1.41`
 
 - **[Bug 08: a `manifest.json` that carries comments is refused](08-manifest-json-with-comments-refused.md)**:
   open. The report-only sample `vimium` fails on chrome and firefox. It does
   not gate: the 2026-11-16 run reads 240 of 240 on the gating samples.
   Repro: `repro/08-manifest-with-comments`.
+
+- **[Bug 09: a file fetched at runtime is dropped with no warning](09-runtime-fetched-file-dropped-without-warning.md)**:
+  open. Found on Dark Reader's release build, which passes the matrix while
+  its output lacks the six site lists the worker fetches.
+  Repro: `repro/09-runtime-fetched-file-not-shipped`.
 
 ## 🟢 Fixed
 
