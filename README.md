@@ -7,7 +7,7 @@
 
 > Real browser extensions, built with every [Extension.js](https://github.com/extension-js/extension.js) release before it ships.
 
-This repository holds 528 extension samples from six upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox, Edge and Safari, and answers `CLEAN` or `NOT CLEAN`.
+This repository holds 532 extension samples from ten upstream sources and the harness that builds them. A run takes one exact Extension.js version from npm, builds every buildable sample on Chrome, Firefox, Edge and Safari, and answers `CLEAN` or `NOT CLEAN`.
 
 ```
 ✅ CLEAN · 4.1.39
@@ -26,12 +26,16 @@ Framework health: 240/240 buildable samples pass (100.0%) · 4 skipped (sample-s
 | [`extension.js/`](extension.js) | Extension.js first-party examples | 60 |
 | [`wpt/`](wpt) | [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt), the test extensions under `web-extensions/resources/` | 6 |
 | [`webextension-demos/`](webextension-demos) | [dotproto/webextension-demos](https://github.com/dotproto/webextension-demos) | 2 |
+| [`vimium/`](vimium) | [philc/vimium](https://github.com/philc/vimium), report-only | 1 |
+| [`privacy-badger/`](privacy-badger) | [EFForg/privacybadger](https://github.com/EFForg/privacybadger), report-only | 1 |
+| [`keepassxc-browser/`](keepassxc-browser) | [keepassxreboot/keepassxc-browser](https://github.com/keepassxreboot/keepassxc-browser), report-only | 1 |
+| [`multi-account-containers/`](multi-account-containers) | [mozilla/multi-account-containers](https://github.com/mozilla/multi-account-containers), report-only | 1 |
 
 Each folder is a copy of its source at one pinned commit. `VENDORED.json` in the folder records the source repository, that commit and a hash of the tree. Every run recomputes the hash, so a sample edited by hand fails the run.
 
-Of the 528 samples, 244 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 244 cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 240 buildable samples, and a failure in any of them is an Extension.js defect.
+Of the 532 samples, 248 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 248 are the report-only extensions described below. Four more cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 240 buildable samples, and a failure in any of them is an Extension.js defect.
 
-Weekly QA also builds one source it only reports: the release builds of [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home), a real extension as its maintainers ship it. The result is printed under the verdict and never changes it. That source is not vendored, so the release gate does not build it.
+Five sources are real extensions that a run builds and only reports. Their result is printed under the verdict and never changes it. Four of them load from source with no build step and are small enough to vendor, so every run builds them, the release gate included: Vimium, Privacy Badger, KeePassXC-Browser and Firefox Multi-Account Containers. The fifth, the release builds of [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home), is about 65 MB and is not vendored, so only Weekly QA builds it. A report-only sample that fails is a finding to read, with its report under [`bug-reports/`](bug-reports) when the cause is Extension.js.
 
 ## Browsers
 
@@ -56,7 +60,7 @@ Every sample is built once per browser. Safari builds go through the converter a
 
 | Workflow | Scope | Effect |
 | :------- | :---- | :----- |
-| [Corpus gate](.github/workflows/corpus-gate.yml) | All 240 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
+| [Corpus gate](.github/workflows/corpus-gate.yml) | All 240 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins, plus the four vendored report-only extensions | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
 | [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`, with Safari on a macOS lane | Opens an issue for a regression that survives a second build |
 | [Smoke](.github/workflows/smoke.yml) | 12 samples on Chrome and Firefox, on every push and pull request | Guards the harness itself |
 
@@ -98,7 +102,7 @@ npm run discover:vendored   # regenerate catalog.json
 npm run baseline:update     # accept the run as the new baseline
 ```
 
-To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed. Check the license first: a source joins only when its license allows a redistributed copy, and the entry records the SPDX id. Set `sparse: true` for a repository far larger than its samples, and `gate: false` for a source that is reported and never decides the verdict.
+To add a source, add one entry to [`sources.json`](sources.json) with its repository, the folders to scan and the tracked folder to vendor into. No code changes are needed. Check the license first: a source joins only when its license allows a redistributed copy, and the entry records the SPDX id. Set `sparse: true` for a repository far larger than its samples, `submodules: true` for one that keeps part of the extension in a submodule, and `gate: false` for a source that is reported and never decides the verdict. A real extension joins as report-only, and a source over 20 MB is not vendored. `node scripts/sync.mjs --source <id>` fetches one source and leaves the other pins alone.
 
 ## License
 
