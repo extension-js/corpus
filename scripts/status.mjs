@@ -51,14 +51,15 @@ function main() {
 
   const clean = f.failures.length === 0 && regressions.length === 0
   const verdict = skew ? '⚠️ RE-BASELINE NEEDED' : clean ? '✅ CLEAN' : '❌ NOT CLEAN'
-  const pct = ((f.pass / f.attempted) * 100).toFixed(1)
+  // A lane that builds only report-only sources has no gating sample to count.
+  const health = f.attempted ? `${f.pass}/${f.attempted} buildable samples pass (${((f.pass / f.attempted) * 100).toFixed(1)}%)` : 'no gating sample in this run'
 
   const dominant = f.failures.length ? dominantFailureReason() : null
 
   const lines = [
     `# ${verdict} · ${diff.cliVersion}`,
     '',
-    `**Framework health:** ${f.pass}/${f.attempted} buildable samples pass (${pct}%) · ${f.skipped} skipped (sample-side/upstream)`,
+    `**Framework health:** ${health} · ${f.skipped} skipped (sample-side/upstream)`,
     ...(dominant
       ? [
           `**Top failure reason:** ${dominant.count}/${dominant.total} failing builds (${dominant.distinct} distinct reason${dominant.distinct === 1 ? '' : 's'}) report: \`${dominant.reason}\``

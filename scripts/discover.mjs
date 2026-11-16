@@ -231,6 +231,19 @@ function main() {
       console.log(
         `${src.id} [${src.layout || 'manifest-root'}] (vendored): ${matrixSamples.length} matrix + ${extraSamples.length} catalog-only (${valid} valid)`
       )
+    } else if (src.build) {
+      // Built by build-sources.mjs, in the lane that runs it. A project that
+      // did not build is one failing sample, so the report still names it.
+      const built = readJson(path.join(ROOT, 'reports', 'builds.json'), {sources: {}}).sources[src.id]
+      if (!built) continue
+      if (built.status === 'built') {
+        const found = discoverSource(src, path.join(CACHE_DIR, src.id), src.scan)
+        samples.push(...found)
+        console.log(`${src.id} [built]: ${found.filter((s) => s.valid).length} samples (${found.filter((s) => !s.valid).length} invalid)`)
+      } else {
+        samples.push({source: src.id, id: src.id, rel: '', path: null, layout: 'manifest-root', tier: 'raw', manifestRel: null, valid: true, name: src.name, projectBuild: `${built.status}: ${built.error}`})
+        console.log(`${src.id} [built]: ${built.status}, reported as one failing sample`)
+      }
     } else {
       const base = path.join(CACHE_DIR, src.id)
       if (!fs.existsSync(base)) {

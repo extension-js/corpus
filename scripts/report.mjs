@@ -81,6 +81,12 @@ function reportOnlyHealth(results) {
   }
 }
 
+// A lane that builds only report-only sources has no gating sample to count.
+function health(f, b = '') {
+  if (!f.attempted) return 'no gating sample in this run'
+  return `${b}${f.pass}/${f.attempted}${b} buildable samples pass (${b}${((f.pass / f.attempted) * 100).toFixed(1)}%${b})`
+}
+
 function isPass(key) {
   return key !== 'skip' && !/=fail|=timeout/.test(key)
 }
@@ -186,9 +192,8 @@ function main() {
   for (const r of regressions) console.log(`  ✗ REGRESSION ${r.id}: ${r.from} → ${r.to}`)
 
   const f = framework
-  const pct = ((f.pass / f.attempted) * 100).toFixed(1)
   console.log(
-    `\nFramework health on ${latest.cliVersion}: ${f.pass}/${f.attempted} buildable samples pass (${pct}%)` +
+    `\nFramework health on ${latest.cliVersion}: ${health(f)}` +
       `  ·  ${f.skipped} skipped (sample-side/upstream)  ·  ${f.failures.length} framework failures`
   )
   for (const id of f.failures) console.log(`  ✗ FRAMEWORK FAIL ${id}`)
@@ -217,8 +222,8 @@ function markdown(d) {
 ${d.criteriaSkew ? `\n> ⚠️ **Criteria changed since baseline** (\`${d.baselineCriteria && d.baselineCriteria.hash}\` → \`${d.criteria.hash}\`). Regression check suppressed — re-baseline required, not a product regression.\n` : ''}
 
 ## Framework health
-**${d.framework.pass}/${d.framework.attempted}** buildable samples pass (**${((d.framework.pass / d.framework.attempted) * 100).toFixed(1)}%**) · ${d.framework.skipped} skipped (sample-side/upstream) · **${d.framework.failures.length} framework failures**
-${d.framework.failures.length ? d.framework.failures.map((id) => `- ❌ \`${id}\``).join('\n') : '_none: Extension.js builds every buildable sample_'}
+${health(d.framework, '**')} · ${d.framework.skipped} skipped (sample-side/upstream) · **${d.framework.failures.length} framework failures**
+${d.framework.failures.length ? d.framework.failures.map((id) => `- ❌ \`${id}\``).join('\n') : d.framework.attempted ? '_none: Extension.js builds every buildable sample_' : ''}
 
 ${
   d.reporting.total
