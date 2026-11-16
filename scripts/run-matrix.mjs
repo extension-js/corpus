@@ -156,6 +156,11 @@ async function processSample(cli, sample) {
     for (const b of BROWSERS) browsers[b] = {status: 'skip', reason: skip.category}
     return {id: sample.id, source: sample.source, tier: sample.tier, skipped: skip.category, browsers, runtime: null}
   }
+  // A foreign project that did not install or build has nothing to hand over.
+  if (sample.projectBuild) {
+    for (const b of BROWSERS) browsers[b] = {status: 'fail', reason: 'project-build', error: sample.projectBuild}
+    return {id: sample.id, source: sample.source, tier: sample.tier, browsers, runtime: null}
+  }
   let dir
   try {
     dir = stage(sample)

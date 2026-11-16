@@ -52,7 +52,8 @@ async function main() {
   const changed = []
   const summary = []
 
-  for (const src of enabledSources().filter((s) => !ONLY || ONLY.includes(s.id))) {
+  // A source with a `build` entry is pinned by commit and fetched by build-sources.mjs.
+  for (const src of enabledSources().filter((s) => !s.build && (!ONLY || ONLY.includes(s.id)))) {
     const dest = path.join(CACHE_DIR, src.id)
     const latest = remoteSha(src.repo, src.ref)
     if (!latest) {
