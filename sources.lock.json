@@ -34,5 +34,29 @@
     "ref": "main",
     "repo": "https://github.com/uBlockOrigin/uBOL-home",
     "fetchedAt": "2026-11-15T17:45:01.368Z"
+  },
+  "vimium": {
+    "sha": "4046615ae4128d485fce3335fc1032e6f87c630a",
+    "ref": "master",
+    "repo": "https://github.com/philc/vimium",
+    "fetchedAt": "2026-11-16T17:53:23.687Z"
+  },
+  "privacy-badger": {
+    "sha": "1bfff6bda70f7dc711ae4701ff9218241d1a3fd7",
+    "ref": "master",
+    "repo": "https://github.com/EFForg/privacybadger",
+    "fetchedAt": "2026-11-16T17:53:26.463Z"
+  },
+  "keepassxc-browser": {
+    "sha": "fab74af89765875e2104003374465374b19a2eff",
+    "ref": "develop",
+    "repo": "https://github.com/keepassxreboot/keepassxc-browser",
+    "fetchedAt": "2026-11-16T17:53:28.052Z"
+  },
+  "multi-account-containers": {
+    "sha": "a77ca17f7825fac919f36d9753007817de782bf1",
+    "ref": "main",
+    "repo": "https://github.com/mozilla/multi-account-containers",
+    "fetchedAt": "2026-11-16T17:53:30.548Z"
   }
 }

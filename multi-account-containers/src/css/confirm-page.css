@@ -1,0 +1,103 @@
+:root {
+  font: message-box;
+  font-size: 15px;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-block-size: 100vh;
+  padding: 40px 48px;
+  align-items: center;
+  justify-content: center;
+}
+
+main {
+  background: url(/img/onboarding-4.png) no-repeat;
+  background-position: 200px 0;
+  background-size: 120px;
+  margin-inline-start: -350px;
+  padding-inline-start: 350px;
+}
+
+.container-name {
+  font-weight: bold;
+}
+
+button .container-name,
+#current-container-name {
+  font-weight: bold;
+}
+
+@media only screen and (max-width: 900px) {
+  main {
+    background: none;
+  }
+
+  /* for a mid sized window we have enough for this but not our image */
+  .title {
+    background-image: url(/img/info.svg);
+  }
+}
+
+#redirect-url,
+#redirect-origin {
+  font-weight: bold;
+
+  /* max-inline-size is needed to force this text smaller than the layout at a mid-sized window */
+  max-inline-size: 40rem;
+  word-break: break-all;
+}
+
+#redirect-url {
+  background: #efedf0; /* Grey 20 */
+  border-radius: 2px;
+  line-height: 1.5;
+  padding-block-end: 0.5rem;
+  padding-block-start: 0.5rem;
+  padding-inline-end: 0.5rem;
+  padding-inline-start: 0.5rem;
+
+  @media (prefers-color-scheme: dark) {
+    background: #38383d; /* Grey 70 */
+    color: #eee; /* White 20 */
+  }
+}
+
+#redirect-url img {
+  block-size: 16px;
+  inline-size: 16px;
+  margin-inline-end: 6px;
+  offset-block-start: 3px;
+  position: relative;
+}
+
+dfn {
+  font-style: normal;
+}
+
+#deny,
+#confirm {
+  flex-grow: 1;
+}
+
+.button-container {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: end;
+  margin-block-start: 1rem;
+
+  > button {
+    min-block-size: 32px;
+    min-inline-size: 240px;
+    padding: 0 1.5rem;
+    margin-inline: 0.25rem;
+  }
+}
+
+.check-label {
+  align-items: center;
+  display: flex;
+}

@@ -1,0 +1,18 @@
+{
+  "source": "multi-account-containers",
+  "name": "Firefox Multi-Account Containers",
+  "repo": "https://github.com/mozilla/multi-account-containers",
+  "ref": "main",
+  "sha": "a77ca17f7825fac919f36d9753007817de782bf1",
+  "vendoredAt": "2026-11-16T17:54:18.735Z",
+  "scan": [
+    "src"
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules"
+  ],
+  "treeHash": "b24b2758e25dd55d",
+  "files": 398,
+  "bytes": 1765769
+}

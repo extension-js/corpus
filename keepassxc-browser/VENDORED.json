@@ -1,0 +1,18 @@
+{
+  "source": "keepassxc-browser",
+  "name": "KeePassXC-Browser",
+  "repo": "https://github.com/keepassxreboot/keepassxc-browser",
+  "ref": "develop",
+  "sha": "fab74af89765875e2104003374465374b19a2eff",
+  "vendoredAt": "2026-11-16T17:54:18.637Z",
+  "scan": [
+    "keepassxc-browser"
+  ],
+  "vendorInclude": [],
+  "prunedTopLevel": [
+    "node_modules"
+  ],
+  "treeHash": "483274e855903f28",
+  "files": 191,
+  "bytes": 3855301
+}

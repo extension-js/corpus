@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title data-i18n-message-id="confirmNavigationTitle"></title>
+<script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/confirm-page.css" />
+<main>
+  <div class="title">
+    <h1 class="title-text" data-i18n-message-id="openThisSiteConfirmation"></h1>
+  </div>
+  <form id="redirect-form">
+    <p data-message-id="youAskedFireFox" data-message-arg="container-name"></p>
+    <div id="redirect-url"></div>
+    <p data-i18n-message-id="wouldYouStillLikeToOpenConfirmation"></p>
+    <br>
+    <br>
+    <label for="never-ask" class="check-label">
+      <input id="never-ask" type="checkbox" />
+      <span data-i18n-message-id="rememberMyDecision"></span>
+    </label>
+    <br>
+    <div class="button-container">
+      <button id="deny" class="button" data-message-id="openInContainer" data-message-arg="current-container-name">
+      </button>
+      <button id="deny-no-container" class="button" data-message-id="openInNoContainer">
+      </button>
+      <button id="confirm" class="button primary" autofocus data-message-id="openInContainer"
+        data-message-arg="container-name">
+      </button>
+    </div>
+  </form>
+</main>
+<script src="js/utils.js"></script>
+<script src="js/confirm-page.js"></script>

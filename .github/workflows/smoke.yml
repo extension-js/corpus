@@ -19,6 +19,10 @@ on:
       - 'extension.js/**'
       - 'wpt/**'
       - 'webextension-demos/**'
+      - 'vimium/**'
+      - 'privacy-badger/**'
+      - 'keepassxc-browser/**'
+      - 'multi-account-containers/**'
       - '.github/workflows/smoke.yml'
   pull_request:
     paths:
@@ -32,6 +36,10 @@ on:
       - 'extension.js/**'
       - 'wpt/**'
       - 'webextension-demos/**'
+      - 'vimium/**'
+      - 'privacy-badger/**'
+      - 'keepassxc-browser/**'
+      - 'multi-account-containers/**'
   workflow_dispatch:
 
 jobs:

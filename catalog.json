@@ -1,6 +1,6 @@
 {
   "$comment": "Committed index of every vendored sample in this repo. Consume this instead of walking for manifest.json: project-root samples keep their manifest under src/ and the sample root (this `dir`) is the only correct build root. `matrix: false` marks catalog-only data the QA matrix never builds (archived or intentionally-broken samples included on purpose).",
-  "generatedAt": "2026-11-15T17:45:12.112Z",
+  "generatedAt": "2026-11-16T17:58:11.485Z",
   "sources": {
     "mdn": {
       "vendorDir": "mdn",
@@ -42,6 +42,38 @@
       "matrixSamples": 2,
       "catalogOnlySamples": 0
     },
+    "vimium": {
+      "vendorDir": "vimium",
+      "sha": "4046615ae4128d485fce3335fc1032e6f87c630a",
+      "ref": "master",
+      "repo": "https://github.com/philc/vimium",
+      "matrixSamples": 1,
+      "catalogOnlySamples": 0
+    },
+    "privacy-badger": {
+      "vendorDir": "privacy-badger",
+      "sha": "1bfff6bda70f7dc711ae4701ff9218241d1a3fd7",
+      "ref": "master",
+      "repo": "https://github.com/EFForg/privacybadger",
+      "matrixSamples": 1,
+      "catalogOnlySamples": 0
+    },
+    "keepassxc-browser": {
+      "vendorDir": "keepassxc-browser",
+      "sha": "fab74af89765875e2104003374465374b19a2eff",
+      "ref": "develop",
+      "repo": "https://github.com/keepassxreboot/keepassxc-browser",
+      "matrixSamples": 1,
+      "catalogOnlySamples": 0
+    },
+    "multi-account-containers": {
+      "vendorDir": "multi-account-containers",
+      "sha": "a77ca17f7825fac919f36d9753007817de782bf1",
+      "ref": "main",
+      "repo": "https://github.com/mozilla/multi-account-containers",
+      "matrixSamples": 1,
+      "catalogOnlySamples": 0
+    },
     "chromium": {
       "vendorDir": "chromium",
       "frozen": true,
@@ -50,7 +82,7 @@
       "catalogOnlySamples": 87
     }
   },
-  "count": 528,
+  "count": 532,
   "samples": [
     {
       "id": "chrome/_archive/apps/samples/analytics",
@@ -434,8 +466,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Identity API Sample",
+      "manifest": "chrome/_archive/apps/samples/identity/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chrome/_archive/apps/samples/image-edit",
@@ -2003,8 +2040,15 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test IME",
+      "manifest": "chrome/_archive/mv2/api/input.ime/basic/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background"
+      ]
     },
     {
       "id": "chrome/_archive/mv2/api/messaging/timer",
@@ -2031,8 +2075,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Native Messaging Example",
+      "manifest": "chrome/_archive/mv2/api/nativeMessaging/app/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chrome/_archive/mv2/api/notifications",
@@ -2041,8 +2090,16 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Notification Demo",
+      "manifest": "chrome/_archive/mv2/api/notifications/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "options"
+      ]
     },
     {
       "id": "chrome/_archive/mv2/api/omnibox/newtab_search",
@@ -5251,8 +5308,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.hid device changed",
+      "manifest": "chromium/api_test/hid/add_change_remove/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/hid/add_event",
@@ -5261,8 +5323,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.hid.onDeviceAdded",
+      "manifest": "chromium/api_test/hid/add_event/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/hid/api",
@@ -5271,8 +5338,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.hid",
+      "manifest": "chromium/api_test/hid/api/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/hid/get_user_selected_devices",
@@ -5296,8 +5368,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.hid.onDeviceRemoved",
+      "manifest": "chromium/api_test/hid/remove_event/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/messaging/connect_external",
@@ -5340,8 +5417,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.usb.onDeviceAdded",
+      "manifest": "chromium/api_test/usb/add_event/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/usb/calls_after_disconnect",
@@ -5350,8 +5432,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Calls to chrome.usb methods after device disconnect",
+      "manifest": "chromium/api_test/usb/calls_after_disconnect/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/usb/device_handling",
@@ -5435,8 +5522,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Mass storage devices in chrome.usb",
+      "manifest": "chromium/api_test/usb/mass_storage/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/usb/remove_event",
@@ -5445,8 +5537,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "chrome.usb.onDeviceRemoved",
+      "manifest": "chromium/api_test/usb/remove_event/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/usb/reset_device",
@@ -5515,8 +5612,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Transfers fail on device disconnect",
+      "manifest": "chromium/api_test/usb/transfer_failure_on_disconnect/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/api_test/usb/zero_length_transfer",
@@ -5786,8 +5888,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test mediaPerceptionPrivate API's setAnalyticsComponent function",
+      "manifest": "chromium/media_perception_private/component/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/media_perception_private/diagnostics",
@@ -5796,8 +5903,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test mediaPerceptionPrivate API's getDiagnostics function.",
+      "manifest": "chromium/media_perception_private/diagnostics/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/media_perception_private/media_perception",
@@ -5806,8 +5918,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test mediaPerceptionPrivate API's MediaPerceptionDetection event listener",
+      "manifest": "chromium/media_perception_private/media_perception/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/media_perception_private/process_state",
@@ -5816,8 +5933,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test mediaPerceptionPrivate API's setComponentProcessState function",
+      "manifest": "chromium/media_perception_private/process_state/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/media_perception_private/state",
@@ -5826,8 +5948,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test mediaPerceptionPrivate API's get and set state functions",
+      "manifest": "chromium/media_perception_private/state/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/platform_app",
@@ -5836,8 +5963,13 @@
       "layout": "manifest-root",
       "matrix": false,
       "tier": "raw",
-      "valid": false,
-      "reason": "unparseable-manifest"
+      "valid": true,
+      "name": "Test Platform App",
+      "manifest": "chromium/platform_app/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": []
     },
     {
       "id": "chromium/sockets_tcp_server/api",
@@ -7430,6 +7562,26 @@
       ]
     },
     {
+      "id": "keepassxc-browser/keepassxc-browser",
+      "source": "keepassxc-browser",
+      "dir": "keepassxc-browser/keepassxc-browser",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "KeePassXC-Browser",
+      "manifest": "keepassxc-browser/keepassxc-browser/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "content_scripts",
+        "action",
+        "options"
+      ]
+    },
+    {
       "id": "mdn/annotate-page",
       "source": "mdn",
       "dir": "mdn/annotate-page",
@@ -8654,6 +8806,66 @@
       "hasBuildStep": false,
       "entrypoints": [
         "sidebar"
+      ]
+    },
+    {
+      "id": "multi-account-containers/src",
+      "source": "multi-account-containers",
+      "dir": "multi-account-containers/src",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "Firefox Multi-Account Containers",
+      "manifest": "multi-account-containers/src/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "content_scripts",
+        "action",
+        "options"
+      ]
+    },
+    {
+      "id": "privacy-badger/src",
+      "source": "privacy-badger",
+      "dir": "privacy-badger/src",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "__MSG_name__",
+      "manifest": "privacy-badger/src/manifest.json",
+      "manifestVersion": 2,
+      "usesBrowserApi": true,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "content_scripts",
+        "action",
+        "options"
+      ]
+    },
+    {
+      "id": "vimium",
+      "source": "vimium",
+      "dir": "vimium",
+      "layout": "manifest-root",
+      "matrix": true,
+      "tier": "raw",
+      "valid": true,
+      "name": "Vimium",
+      "manifest": "vimium/manifest.json",
+      "manifestVersion": 3,
+      "usesBrowserApi": false,
+      "hasBuildStep": false,
+      "entrypoints": [
+        "background",
+        "content_scripts",
+        "action",
+        "options"
       ]
     },
     {
