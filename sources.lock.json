@@ -58,5 +58,23 @@
     "ref": "main",
     "repo": "https://github.com/mozilla/multi-account-containers",
     "fetchedAt": "2026-11-16T17:53:30.548Z"
+  },
+  "dark-reader": {
+    "sha": "ad173374991a7bc0a1651fb52eb3d9e18b224bec",
+    "ref": "main",
+    "repo": "https://github.com/darkreader/darkreader",
+    "fetchedAt": "2026-11-16T18:03:35.312Z"
+  },
+  "obsidian-clipper": {
+    "sha": "6d56d618b00bd970aa738d6a7a61edee27783e81",
+    "ref": "main",
+    "repo": "https://github.com/obsidianmd/obsidian-clipper",
+    "fetchedAt": "2026-11-16T18:04:13.178Z"
+  },
+  "refined-github": {
+    "sha": "bcac6b9d5155681be1b0e4c22588ddd09ed72372",
+    "ref": "main",
+    "repo": "https://github.com/refined-github/refined-github",
+    "fetchedAt": "2026-11-16T18:05:39.381Z"
   }
 }
