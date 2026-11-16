@@ -35,7 +35,11 @@ Each folder is a copy of its source at one pinned commit. `VENDORED.json` in the
 
 Of the 532 samples, 248 are in the build matrix. The rest are kept as data: archived samples and manifests that are invalid by design. Four of the 248 are the report-only extensions described below. Four more cannot build for reasons of their own, such as a manifest that points at output the sample's own bundler must produce first. They are listed in [`skips.json`](skips.json) with the reason and the date each was last verified. That leaves 240 buildable samples, and a failure in any of them is an Extension.js defect.
 
-Five sources are real extensions that a run builds and only reports. Their result is printed under the verdict and never changes it. Four of them load from source with no build step and are small enough to vendor, so every run builds them, the release gate included: Vimium, Privacy Badger, KeePassXC-Browser and Firefox Multi-Account Containers. The fifth, the release builds of [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home), is about 65 MB and is not vendored, so only Weekly QA builds it. A report-only sample that fails is a finding to read, with its report under [`bug-reports/`](bug-reports) when the cause is Extension.js.
+Eight sources are real extensions that a run builds and only reports. Their result is printed under the verdict and never changes it. A report-only sample that fails is a finding to read, with its report under [`bug-reports/`](bug-reports) when the cause is Extension.js.
+
+- Four load from source with no build step and are small enough to vendor, so every run builds them, the release gate included: Vimium, Privacy Badger, KeePassXC-Browser and Firefox Multi-Account Containers.
+- The release builds of [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) are about 65 MB and are not vendored, so only Weekly QA builds them.
+- Three need their own build first, because the manifest in their repository is a template or names files only their bundler writes: [Dark Reader](https://github.com/darkreader/darkreader), [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper) and [Refined GitHub](https://github.com/refined-github/refined-github). They have their own lane, described under [Built extensions](#built-extensions).
 
 ## Browsers
 
@@ -62,6 +66,7 @@ Every sample is built once per browser. Safari builds go through the converter a
 | :------- | :---- | :----- |
 | [Corpus gate](.github/workflows/corpus-gate.yml) | All 240 samples on Chrome, Firefox, Edge and Safari, at the commit the release pins, plus the four vendored report-only extensions | A stable Extension.js release does not publish unless the canary built from the same commit is `CLEAN`. Every release is then read again with the exact version that reached npm |
 | [Weekly QA](.github/workflows/weekly-qa.yml) | All samples at the latest upstream commits, against `extension@latest`, with Safari on a macOS lane | Opens an issue for a regression that survives a second build |
+| [Built extensions](.github/workflows/built-extensions.yml) | Three real extensions, each built by its own build command at a pinned commit, then built by Extension.js on Chrome, Firefox and Edge | Reports only. The job cannot fail the run and the gate does not call it |
 | [Smoke](.github/workflows/smoke.yml) | 12 samples on Chrome and Firefox, on every push and pull request | Guards the harness itself |
 
 Run the gate by hand for any version on npm:
@@ -85,6 +90,24 @@ npm run status   # print the last verdict
 | `EXTENSION_CLI_PATH=/abs/path/cli.cjs` | A local, unreleased build |
 
 Scope a run with `node scripts/run-matrix.mjs --source mdn --browsers chrome,firefox --limit 20`. Safari builds through Xcode and runs on macOS only.
+
+## Built extensions
+
+Some extensions cannot be built from their repository, because the manifest there is a template or names files that only the project's bundler writes. [`scripts/build-sources.mjs`](scripts/build-sources.mjs) builds those first and hands the output to the same matrix:
+
+1. It fetches the one commit the source pins in [`sources.json`](sources.json), a full SHA, never a branch.
+2. It refuses a lockfile that resolves anything outside the npm registry, such as a git URL.
+3. It runs `npm ci --ignore-scripts`, so no dependency runs code at install.
+4. It runs the project's own build command, untouched, inside the clone, with an environment that holds no token.
+5. Each output folder named in `scan` becomes a sample, and `extension build` builds it once per browser.
+
+```bash
+npm run built   # fetch, install, build, then the matrix and the verdict
+```
+
+The project's source is never edited and its output is never committed: the clone lives in `.cache/`, which git ignores. These sources are always report-only. A project that fails to install or build is written to `reports/builds.json` and shows up as one failing report-only sample, and the verdict does not move.
+
+To add one, add an entry with `commit`, `build.run` and the output folders in `scan`. Read the license at that commit first, and build it once from a clean clone. A project with a pnpm or Yarn lockfile is refused today: the registry check reads `package-lock.json` only.
 
 ## Use the samples in your own tests
 
