@@ -19,8 +19,12 @@
 // Browsers: chrome,firefox,edge by default. safari is macOS/Xcode-only and is
 // recorded as skip:non-macos elsewhere.
 //
-// Flags: --browsers a,b  --source id  --tier raw|install|all  --install
-//        --runtime  --concurrency n  --limit n
+// --score names the browsers a run answers for. The other browsers in
+// --browsers are still built, in the order given and in the same staged folder,
+// and stay out of the verdict, the totals and the warnings.
+//
+// Flags: --browsers a,b  --score a  --source id  --tier raw|install|all
+//        --install  --runtime  --concurrency n  --limit n
 import {spawn} from 'node:child_process'
 import os from 'node:os'
 import {ROOT, REPORTS_DIR, readJson, writeJson, pool, execAsync, exec, ensureDir, loadSkips, fs, path} from './lib/util.mjs'
@@ -36,6 +40,13 @@ const flag = (n, d) => {
 const has = (n) => argv.includes(`--${n}`)
 
 const BROWSERS = flag('browsers', 'chrome,firefox,edge').split(',')
+const SCORED = flag('score', BROWSERS.join(',')).split(',')
+const UNSCORED = BROWSERS.filter((b) => !SCORED.includes(b))
+const NOT_BUILT = SCORED.filter((b) => !BROWSERS.includes(b))
+if (NOT_BUILT.length > 0) {
+  console.error(`--score names a browser that --browsers does not build: ${NOT_BUILT.join(', ')}`)
+  process.exit(2)
+}
 const ONLY_SOURCE = flag('source', null)
 const ONLY_IDS = flag('only', null) // comma-separated sample ids (for confirm re-runs)
 const OUT = flag('out', null) // write report here instead of latest.json (confirm re-runs)
@@ -189,19 +200,19 @@ async function processSampleCells(cli, sample) {
   // them entirely so the framework pass-rate isn't polluted (reasons in skips.json).
   const skip = SKIPS[sample.id]
   if (skip && !has('no-skips')) {
-    for (const b of BROWSERS) browsers[b] = {status: 'skip', reason: skip.category}
+    for (const b of SCORED) browsers[b] = {status: 'skip', reason: skip.category}
     return {id: sample.id, source: sample.source, tier: sample.tier, skipped: skip.category, browsers, runtime: null}
   }
   // A foreign project that did not install or build has nothing to hand over.
   if (sample.projectBuild) {
-    for (const b of BROWSERS) browsers[b] = {status: 'fail', reason: 'project-build', error: sample.projectBuild}
+    for (const b of SCORED) browsers[b] = {status: 'fail', reason: 'project-build', error: sample.projectBuild}
     return {id: sample.id, source: sample.source, tier: sample.tier, browsers, runtime: null}
   }
   let dir
   try {
     dir = stage(sample)
   } catch (e) {
-    for (const b of BROWSERS) browsers[b] = {status: 'fail', error: String(e.message)}
+    for (const b of SCORED) browsers[b] = {status: 'fail', error: String(e.message)}
     return {id: sample.id, source: sample.source, tier: sample.tier, browsers, runtime: null}
   }
 
@@ -225,11 +236,19 @@ async function processSampleCells(cli, sample) {
     env.EXTENSION_SKIP_INSTALL = '1'
   }
 
+  // An unscored browser is built for what it leaves in the folder. Its status
+  // and time are kept beside the cells, where no verdict reads them.
+  const unscored = {}
   for (const b of BROWSERS) {
-    if (b === 'safari' && !IS_MAC) { browsers[b] = {status: 'skip', reason: 'non-macos'}; continue }
-    if (sample.tier === 'install' && !DO_INSTALL) { browsers[b] = {status: 'skip', reason: 'needs-install'}; continue }
-    if (installFailed) { browsers[b] = {status: 'fail', error: `install: ${installFailed}` }; continue }
+    const cells = SCORED.includes(b) ? browsers : unscored
+    if (b === 'safari' && !IS_MAC) { cells[b] = {status: 'skip', reason: 'non-macos'}; continue }
+    if (sample.tier === 'install' && !DO_INSTALL) { cells[b] = {status: 'skip', reason: 'needs-install'}; continue }
+    if (installFailed) { cells[b] = {status: 'fail', error: `install: ${installFailed}` }; continue }
     const built = await build(cli, dir, b, env, sample)
+    if (cells === unscored) {
+      unscored[b] = {status: built.cell.status, ms: built.cell.ms}
+      continue
+    }
     browsers[b] = built.cell
     warnings[b] = built.warnings
   }
@@ -237,14 +256,23 @@ async function processSampleCells(cli, sample) {
   let runtime = null
   if (has('runtime') && RUNTIME_SET.has(sample.id)) {
     runtime = {}
-    for (const b of BROWSERS) {
+    for (const b of SCORED) {
       if (b === 'safari' && !IS_MAC) { runtime[b] = {status: 'skip', reason: 'non-macos'}; continue }
       runtime[b] = await devSmoke(cli, dir, b, env)
     }
   }
 
   fs.rmSync(dir, {recursive: true, force: true})
-  return {id: sample.id, source: sample.source, tier: sample.tier, manifestVersion: sample.manifestVersion, browsers, runtime, warnings}
+  return {
+    id: sample.id,
+    source: sample.source,
+    tier: sample.tier,
+    manifestVersion: sample.manifestVersion,
+    browsers,
+    ...(UNSCORED.length > 0 ? {unscored} : {}),
+    runtime,
+    warnings
+  }
 }
 
 let RUNTIME_SET = new Set()
@@ -266,8 +294,9 @@ async function main() {
   if (LIMIT > 0) work = work.slice(0, LIMIT)
   RUNTIME_SET = new Set(has('runtime') ? readJson(path.join(ROOT, 'runtime.json'), {samples: []}).samples : [])
 
-  const effectiveBrowsers = BROWSERS.filter((b) => b !== 'safari' || IS_MAC)
+  const effectiveBrowsers = SCORED.filter((b) => b !== 'safari' || IS_MAC)
   console.log(`CLI: ${cli.label}  |  tier=${TIER}  install=${DO_INSTALL}  |  ${work.length} samples × [${BROWSERS.join(', ')}]${!IS_MAC && BROWSERS.includes('safari') ? ' (safari→skip)' : ''}  |  concurrency ${CONCURRENCY}`)
+  if (UNSCORED.length > 0) console.log(`Built and not scored: ${UNSCORED.join(', ')}  |  scored: ${SCORED.join(', ')}`)
   prewarm(cli)
 
   let done = 0
@@ -293,7 +322,7 @@ async function main() {
     cliVersion: cli.version,
     platform: os.platform(),
     tier: TIER,
-    browsers: BROWSERS,
+    browsers: SCORED,
     integrity: CHECK_INTEGRITY, // recorded so report.mjs can fingerprint scoring criteria
     totals: summarize(results, effectiveBrowsers),
     results

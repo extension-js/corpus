@@ -93,8 +93,8 @@ jobs:
           path: reports/
 
   # Safari builds through Xcode, so this lane needs macOS. It converts and
-  # builds every sample for Safari and opens no browser. A failing build fails
-  # the call.
+  # builds every sample for Safari and opens no browser. A failing Safari
+  # build fails the call.
   safari:
     if: ${{ inputs.safari == true }}
     runs-on: macos-latest
@@ -116,9 +116,13 @@ jobs:
       - run: node scripts/assert-runtime-supported.mjs
       - run: node scripts/vendor.mjs --check
       - run: node scripts/discover.mjs --vendored
-      - run: node scripts/run-matrix.mjs --tier all --install --browsers safari
-      # The Safari baseline holds four browsers, and this lane builds one, so
-      # it reports health with no baseline. Any failing build fails the lane.
+      # Weekly QA builds Chrome in the same folder before Safari and its Safari
+      # builds take a third of the time, so this lane builds Chrome first too.
+      # The lane above answers for Chrome: only Safari is scored here.
+      - run: node scripts/run-matrix.mjs --tier all --install --browsers chrome,safari --score safari
+      # The Safari baseline holds four browsers, and this lane scores one, so
+      # it reports health with no baseline. Any failing Safari build fails the
+      # lane.
       - name: Report
         run: node scripts/report.mjs --markdown --no-baseline
         continue-on-error: true
