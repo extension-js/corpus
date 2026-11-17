@@ -34,19 +34,60 @@ export function readBuildSummary(projectDir, browser, startedAt) {
   return {warningsCount: count, warnings}
 }
 
-// The lines to print under a sample's verdict line: the warnings of each cell
-// that passed and warned. The CLI caps the list it writes, so a count above the
-// list length is said out loud instead of looking like the whole story.
-export function passingWarningLines(browsers, warningsByBrowser) {
-  const lines = []
-  for (const [browser, cell] of Object.entries(browsers)) {
-    if (cell.status !== 'pass' || !(cell.warningsCount > 0)) continue
-    const warnings = warningsByBrowser[browser] || []
-    const shown = warnings.length < cell.warningsCount ? `, ${warnings.length} listed` : ''
-    lines.push(`  ${browser}: ${cell.warningsCount} warning${cell.warningsCount === 1 ? '' : 's'}${shown}`)
-    for (const warning of warnings) {
-      for (const line of warning.trim().split('\n')) lines.push(`    ${line}`)
+// A warning names files by the sample's throwaway folder, which differs for
+// every sample. With that folder removed, the same warning reads the same in
+// every cell it shows up in, and a path reads relative to the sample.
+export function withoutSamplePaths(warning, dirs) {
+  let text = warning
+  // Longest first: on macOS the resolved folder contains the unresolved one.
+  for (const dir of [...new Set(dirs)].filter(Boolean).sort((a, b) => b.length - a.length)) {
+    text = text.split(dir + path.sep).join('').split(dir).join('.')
+  }
+  return text.trim()
+}
+
+function indented(warning) {
+  return warning.split('\n').map((line) => `      ${line}`)
+}
+
+// The warnings block printed once, after the last verdict line. `cells` holds
+// one entry per passing cell that warned: {id, browser, warningsCount, warnings}.
+// A warning that reads the same in several cells is printed once with its cell
+// count and one cell to look at. Only a warning no other cell has is printed
+// under its own cell, so 240 samples that share one warning cost one entry.
+export function warningReportLines(cells) {
+  const warned = cells.filter((c) => c.warningsCount > 0)
+  if (warned.length === 0) return []
+  const ordered = [...warned].sort((a, b) => a.id.localeCompare(b.id))
+
+  const seenIn = new Map()
+  for (const cell of ordered) {
+    for (const warning of new Set(cell.warnings)) {
+      if (!seenIn.has(warning)) seenIn.set(warning, [])
+      seenIn.get(warning).push(cell)
     }
   }
+  const shared = [...seenIn].filter(([, list]) => list.length > 1).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+
+  const lines = ['', `Warnings in passing cells: ${seenIn.size} distinct in ${warned.length} cell${warned.length === 1 ? '' : 's'}`]
+  if (shared.length > 0) {
+    lines.push('', '  In more than one cell:')
+    for (const [warning, list] of shared) {
+      lines.push(`    ${list.length} cells, for example ${list[0].id} (${list[0].browser})`, ...indented(warning))
+    }
+  }
+
+  // The CLI caps the list it writes, so a count above the list length is said
+  // out loud instead of looking like the whole story.
+  const own = []
+  for (const cell of ordered) {
+    const unique = cell.warnings.filter((w) => seenIn.get(w).length === 1)
+    const cut = cell.warnings.length < cell.warningsCount
+    if (unique.length === 0 && !cut) continue
+    const listed = cut ? `: ${cell.warningsCount} warnings, ${cell.warnings.length} listed by the CLI` : ''
+    own.push(`    ${cell.id} (${cell.browser})${listed}`)
+    for (const warning of unique) own.push(...indented(warning))
+  }
+  if (own.length > 0) lines.push('', '  In one cell only:', ...own)
   return lines
 }

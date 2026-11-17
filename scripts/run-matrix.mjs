@@ -26,7 +26,7 @@ import os from 'node:os'
 import {ROOT, REPORTS_DIR, readJson, writeJson, pool, execAsync, exec, ensureDir, loadSkips, fs, path} from './lib/util.mjs'
 import {resolveCli, cliArgs} from './lib/cli.mjs'
 import {checkManifestAssets} from './lib/integrity.mjs'
-import {readBuildSummary, passingWarningLines} from './lib/summary.mjs'
+import {readBuildSummary, withoutSamplePaths, warningReportLines} from './lib/summary.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (n, d) => {
@@ -90,7 +90,17 @@ async function build(cli, dir, browser, env, sample) {
   const startedAt = Date.now()
   const cell = await buildVerdict(cli, dir, browser, env, sample)
   const {warningsCount, warnings} = readBuildSummary(outputRoot(dir, sample), browser, startedAt)
-  return {cell: {...cell, warningsCount}, warnings}
+  const dirs = [dir, realDir(dir)]
+  return {cell: {...cell, warningsCount}, warnings: warnings.map((w) => withoutSamplePaths(w, dirs))}
+}
+
+// The CLI prints resolved paths, and the OS temp dir is a symlink on macOS.
+function realDir(dir) {
+  try {
+    return fs.realpathSync(dir)
+  } catch {
+    return dir
+  }
 }
 
 async function buildVerdict(cli, dir, browser, env, sample) {
@@ -261,14 +271,19 @@ async function main() {
   prewarm(cli)
 
   let done = 0
+  // Warnings wait for the end of the run: whether one is shared by other cells
+  // is only known once every cell has been read.
+  const warnedCells = []
   const results = await pool(work, CONCURRENCY, async (sample) => {
     const {result: r, warnings} = await processSample(cli, sample)
     done++
     const flat = Object.entries(r.browsers).map(([b, v]) => `${b}:${v.status}`).join(' ')
-    // One write per sample, so the warnings stay under their own verdict line
-    // while other samples finish around them.
-    const lines = [`[${done}/${work.length}] ${r.id}: ${flat}`, ...passingWarningLines(r.browsers, warnings)]
-    process.stdout.write(lines.join('\n') + '\n')
+    process.stdout.write(`[${done}/${work.length}] ${r.id}: ${flat}\n`)
+    for (const [browser, cell] of Object.entries(r.browsers)) {
+      if (cell.status === 'pass' && cell.warningsCount > 0) {
+        warnedCells.push({id: r.id, browser, warningsCount: cell.warningsCount, warnings: warnings[browser] || []})
+      }
+    }
     return r
   })
 
@@ -293,6 +308,8 @@ async function main() {
     writeJson(path.join(REPORTS_DIR, 'latest.json'), report)
   }
   fs.rmSync(WORK, {recursive: true, force: true})
+  const warningLines = warningReportLines(warnedCells)
+  if (warningLines.length > 0) console.log(warningLines.join('\n'))
   console.log(`\n${JSON.stringify(report.totals, null, 2)}`)
 }
 
