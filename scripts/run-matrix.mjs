@@ -26,6 +26,7 @@ import os from 'node:os'
 import {ROOT, REPORTS_DIR, readJson, writeJson, pool, execAsync, exec, ensureDir, loadSkips, fs, path} from './lib/util.mjs'
 import {resolveCli, cliArgs} from './lib/cli.mjs'
 import {checkManifestAssets} from './lib/integrity.mjs'
+import {readBuildSummary, passingWarningLines} from './lib/summary.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (n, d) => {
@@ -82,7 +83,17 @@ function outputRoot(dir, sample) {
   return path.join(dir, project)
 }
 
+// A cell's verdict, plus what the CLI's own summary says about warnings. The
+// summary is read for every verdict and changes none: warningsCount is null when
+// the CLI under test wrote no summary for this build.
 async function build(cli, dir, browser, env, sample) {
+  const startedAt = Date.now()
+  const cell = await buildVerdict(cli, dir, browser, env, sample)
+  const {warningsCount, warnings} = readBuildSummary(outputRoot(dir, sample), browser, startedAt)
+  return {cell: {...cell, warningsCount}, warnings}
+}
+
+async function buildVerdict(cli, dir, browser, env, sample) {
   // Retry once on a hard build failure to absorb transient blips (npx cold-cache
   // races on fresh CI runners, network). A deterministic failure fails both tries.
   let r
@@ -147,8 +158,23 @@ function selectTier(sample) {
   return sample.tier === 'raw'
 }
 
+// Every cell carries warningsCount, so a reader never has to tell a missing
+// key from an unknown count. A cell that never built has nothing to count.
+function withWarningsCount(result) {
+  for (const cell of Object.values(result.browsers)) {
+    if (cell.warningsCount === undefined) cell.warningsCount = null
+  }
+  return result
+}
+
 async function processSample(cli, sample) {
+  const {warnings, ...result} = await processSampleCells(cli, sample)
+  return {result: withWarningsCount(result), warnings: warnings || {}}
+}
+
+async function processSampleCells(cli, sample) {
   const browsers = {}
+  const warnings = {}
   // Sample-side / upstream failures are not Extension.js's fault: skip building
   // them entirely so the framework pass-rate isn't polluted (reasons in skips.json).
   const skip = SKIPS[sample.id]
@@ -193,7 +219,9 @@ async function processSample(cli, sample) {
     if (b === 'safari' && !IS_MAC) { browsers[b] = {status: 'skip', reason: 'non-macos'}; continue }
     if (sample.tier === 'install' && !DO_INSTALL) { browsers[b] = {status: 'skip', reason: 'needs-install'}; continue }
     if (installFailed) { browsers[b] = {status: 'fail', error: `install: ${installFailed}` }; continue }
-    browsers[b] = await build(cli, dir, b, env, sample)
+    const built = await build(cli, dir, b, env, sample)
+    browsers[b] = built.cell
+    warnings[b] = built.warnings
   }
 
   let runtime = null
@@ -206,7 +234,7 @@ async function processSample(cli, sample) {
   }
 
   fs.rmSync(dir, {recursive: true, force: true})
-  return {id: sample.id, source: sample.source, tier: sample.tier, manifestVersion: sample.manifestVersion, browsers, runtime}
+  return {id: sample.id, source: sample.source, tier: sample.tier, manifestVersion: sample.manifestVersion, browsers, runtime, warnings}
 }
 
 let RUNTIME_SET = new Set()
@@ -234,10 +262,13 @@ async function main() {
 
   let done = 0
   const results = await pool(work, CONCURRENCY, async (sample) => {
-    const r = await processSample(cli, sample)
+    const {result: r, warnings} = await processSample(cli, sample)
     done++
     const flat = Object.entries(r.browsers).map(([b, v]) => `${b}:${v.status}`).join(' ')
-    process.stdout.write(`[${done}/${work.length}] ${r.id}: ${flat}\n`)
+    // One write per sample, so the warnings stay under their own verdict line
+    // while other samples finish around them.
+    const lines = [`[${done}/${work.length}] ${r.id}: ${flat}`, ...passingWarningLines(r.browsers, warnings)]
+    process.stdout.write(lines.join('\n') + '\n')
     return r
   })
 
