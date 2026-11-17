@@ -1,6 +1,6 @@
 {
   "$comment": "Committed index of every vendored sample in this repo. Consume this instead of walking for manifest.json: project-root samples keep their manifest under src/ and the sample root (this `dir`) is the only correct build root. `matrix: false` marks catalog-only data the QA matrix never builds (archived or intentionally-broken samples included on purpose).",
-  "generatedAt": "2026-11-16T17:58:11.485Z",
+  "generatedAt": "2026-11-17T15:43:56.889Z",
   "sources": {
     "mdn": {
       "vendorDir": "mdn",
@@ -22,7 +22,7 @@
       "vendorDir": "extension.js",
       "sha": "954d00c85cf00b277be04c87f4c36f9f9dc8d577",
       "ref": "main",
-      "repo": "https://github.com/extension-js/examples",
+      "repo": "https://github.com/extension-js/templates",
       "matrixSamples": 60,
       "catalogOnlySamples": 0
     },
