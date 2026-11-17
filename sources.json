@@ -48,7 +48,7 @@
     {
       "id": "extensionjs",
       "name": "Extension.js first-party examples",
-      "repo": "https://github.com/extension-js/examples",
+      "repo": "https://github.com/extension-js/templates",
       "ref": "main",
       "api": "mixed",
       "layout": "project-root",

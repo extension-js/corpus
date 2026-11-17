@@ -1,7 +1,7 @@
 {
   "source": "extensionjs",
   "name": "Extension.js first-party examples",
-  "repo": "https://github.com/extension-js/examples",
+  "repo": "https://github.com/extension-js/templates",
   "ref": "main",
   "sha": "954d00c85cf00b277be04c87f4c36f9f9dc8d577",
   "vendoredAt": "2026-11-14T21:13:32.930Z",
