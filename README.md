@@ -60,6 +60,8 @@ Every sample is built once per browser. Safari builds go through the converter a
 3. Every file the emitted `manifest.json` names exists in the output. A build that exits 0 and drops an icon is a failure.
 4. The result is compared with [`baseline.json`](baseline.json), or [`baseline.safari.json`](baseline.safari.json) on macOS, the last accepted run of a stable version. A failing sample is built again before it counts, so a flaky runner is not reported as a regression.
 
+A build that passes can still warn. The run log ends with the warnings of the passing cells: one that reads the same in several cells is printed once with its cell count and one cell to look at, and one that a single cell has is printed under that cell. The matrix report records `warningsCount` for each cell, `null` when the CLI under test wrote no build summary. A warning never changes a verdict.
+
 ## When it runs
 
 | Workflow | Scope | Effect |
